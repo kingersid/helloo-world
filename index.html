@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,15 +8,21 @@
     <!-- Google Fonts: Merriweather (Main) and Caveat (Handwriting) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,400&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    
+    <link
+        href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,400&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <style>
         :root {
-            --primary: #2c3e50;      /* Midnight Blue */
-            --accent: #d4af37;       /* Soft Gold */
-            --bg: #fdfaf5;           /* Warm Off-white/Cream */
-            --text: #2c3e50;         /* Dark Text */
+            --primary: #2c3e50;
+            /* Midnight Blue */
+            --accent: #d4af37;
+            /* Soft Gold */
+            --bg: #fdfaf5;
+            /* Warm Off-white/Cream */
+            --text: #2c3e50;
+            /* Dark Text */
             --text-light: #5f6368;
             --border: #e0e0e0;
             --white: #ffffff;
@@ -44,7 +51,7 @@
             position: sticky;
             top: 0;
             z-index: 1000;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
         .nav-link {
@@ -59,7 +66,8 @@
             transition: all 0.3s;
         }
 
-        .nav-link:hover, .nav-link.active {
+        .nav-link:hover,
+        .nav-link.active {
             border-bottom-color: var(--accent);
             color: var(--accent);
         }
@@ -72,7 +80,7 @@
             flex-direction: column;
             align-items: center;
             border-bottom: 2px solid var(--accent);
-            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
         }
 
         .logo {
@@ -80,12 +88,15 @@
             margin-bottom: 1rem;
             transition: transform 0.3s;
         }
-        .logo:hover { transform: scale(1.05); }
 
-        h1 { 
-            text-align: center; 
-            color: var(--primary); 
-            margin: 0; 
+        .logo:hover {
+            transform: scale(1.05);
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            margin: 0;
             font-size: 2.2rem;
             letter-spacing: 1px;
             font-weight: 900;
@@ -100,7 +111,7 @@
             background: var(--white);
             border: 1px solid var(--border);
             border-radius: 4px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
         }
 
         button {
@@ -117,10 +128,11 @@
             letter-spacing: 1.5px;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
         button:hover {
             background-color: var(--white);
             color: var(--primary);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
 
         #newBillBtn {
@@ -130,14 +142,17 @@
         }
 
         /* Dashboard Styles */
-        .dashboard { margin-top: 1rem; }
-        
+        .dashboard {
+            margin-top: 1rem;
+        }
+
         .summary-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 2rem;
             margin-bottom: 3rem;
         }
+
         .summary-card {
             background: #fafafa;
             padding: 2rem;
@@ -145,9 +160,22 @@
             border-bottom: 4px solid var(--accent);
             text-align: center;
         }
-        .summary-card h4 { margin: 0; color: var(--text-light); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 2px; }
-        .summary-card p { margin: 15px 0 5px; font-size: 2rem; font-weight: 900; color: var(--primary); }
-        
+
+        .summary-card h4 {
+            margin: 0;
+            color: var(--text-light);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .summary-card p {
+            margin: 15px 0 5px;
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
         .handwritten {
             font-family: 'Caveat', cursive;
             font-size: 1.4rem;
@@ -170,10 +198,26 @@
             font-size: 1.2rem;
         }
 
-        .form-group { margin-bottom: 1.5rem; }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 1.5rem; }
-        
-        label { display: block; margin-bottom: 0.5rem; font-weight: 700; font-size: 0.85rem; color: var(--text-light); text-transform: uppercase; }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--text-light);
+            text-transform: uppercase;
+        }
+
         input {
             width: 100%;
             padding: 12px;
@@ -184,13 +228,40 @@
             font-size: 1rem;
             background: #fafafa;
         }
-        input:focus { outline: none; border-color: var(--accent); background: white; }
-        input[readonly] { background-color: #f1f3f4; border-color: #eee; color: #777; }
 
-        table { width: 100%; border-collapse: collapse; margin: 2rem 0; }
-        th, td { text-align: left; padding: 16px; border-bottom: 1px solid var(--border); }
-        th { background-color: #fafafa; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-light); }
-        
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: white;
+        }
+
+        input[readonly] {
+            background-color: #f1f3f4;
+            border-color: #eee;
+            color: #777;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #fafafa;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-light);
+        }
+
         /* Dashboard Handwriting column */
         .cust-name-cell {
             font-family: 'Caveat', cursive;
@@ -206,26 +277,68 @@
             background: #fafafa;
             border-radius: 4px;
         }
-        .totals-section label { margin-bottom: 0; display: inline; padding-right: 15px; }
-        #grandTotalDisplay { color: var(--primary); font-size: 2rem; font-weight: 900; }
-        
-        .actions { display: flex; justify-content: space-between; align-items: center; margin-top: 3rem; }
-        
-        .btn-add-item { background: transparent; color: var(--primary); border: 2px solid var(--primary); font-size: 0.8rem; }
-        .btn-add-item:hover { background: var(--primary); color: white; }
 
-        .btn-cancel { background: transparent; color: var(--danger); border-color: var(--danger); }
-        .btn-cancel:hover { background: var(--danger); color: white; }
+        .totals-section label {
+            margin-bottom: 0;
+            display: inline;
+            padding-right: 15px;
+        }
 
-        .btn-submit { background: var(--success); border-color: var(--success); }
-        .btn-submit:hover { color: var(--success); border-color: var(--success); }
+        #grandTotalDisplay {
+            color: var(--primary);
+            font-size: 2rem;
+            font-weight: 900;
+        }
+
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 3rem;
+        }
+
+        .btn-add-item {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            font-size: 0.8rem;
+        }
+
+        .btn-add-item:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-cancel {
+            background: transparent;
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        .btn-cancel:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-submit {
+            background: var(--success);
+            border-color: var(--success);
+        }
+
+        .btn-submit:hover {
+            color: var(--success);
+            border-color: var(--success);
+        }
 
         /* Success Modal Styles */
         .modal-overlay {
             display: none;
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
             z-index: 2000;
             justify-content: center;
             align-items: center;
@@ -234,6 +347,7 @@
             padding: 20px;
             box-sizing: border-box;
         }
+
         .success-card {
             background: white;
             padding: 3rem;
@@ -242,20 +356,34 @@
             width: 100%;
             text-align: center;
             border-top: 5px solid var(--success);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
-            margin: auto; /* Centering fix for flex + overflow */
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            margin: auto;
+            /* Centering fix for flex + overflow */
         }
-        .success-card h2 { color: var(--success); margin-top: 0; margin-bottom: 20px; }
-        .success-card p { font-size: 1.1rem; line-height: 1.6; color: #555; margin-bottom: 30px; }
+
+        .success-card h2 {
+            color: var(--success);
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+
+        .success-card p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #555;
+            margin-bottom: 30px;
+        }
+
         .modal-actions {
             display: flex;
             flex-direction: column;
             gap: 1rem;
             margin-top: 2rem;
         }
-        .btn-whatsapp { 
-            background: #25D366; 
-            border-color: #25D366; 
+
+        .btn-whatsapp {
+            background: #25D366;
+            border-color: #25D366;
             text-decoration: none;
             color: white;
             padding: 16px;
@@ -266,8 +394,12 @@
             letter-spacing: 1px;
             transition: background 0.3s;
         }
-        .btn-whatsapp:hover { background: #128C7E; color: white; }
-        
+
+        .btn-whatsapp:hover {
+            background: #128C7E;
+            color: white;
+        }
+
         .btn-close-modal {
             background-color: transparent;
             color: #777;
@@ -280,6 +412,7 @@
             cursor: pointer;
             transition: all 0.3s;
         }
+
         .btn-close-modal:hover {
             background-color: #f5f5f5;
             color: var(--primary);
@@ -293,7 +426,7 @@
                 padding: 2rem;
                 margin-top: 2rem;
             }
-            
+
             .summary-grid {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 1.5rem;
@@ -308,11 +441,13 @@
                 padding: 10px 20px;
             }
 
-            input, button {
+            input,
+            button {
                 min-height: 48px;
             }
 
-            th, td {
+            th,
+            td {
                 padding: 20px 12px;
             }
 
@@ -327,7 +462,7 @@
             .summary-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             h1 {
                 font-size: 1.8rem;
             }
@@ -338,6 +473,7 @@
         }
     </style>
 </head>
+
 <body>
     <nav class="navbar">
         <a href="#" class="nav-link active" id="navDashboard">Dashboard</a>
@@ -356,7 +492,9 @@
         <!-- New Bill Button remains for quick access on dashboard -->
         <div style="display: flex; justify-content: center; gap: 1rem; margin-bottom: 3rem;">
             <button id="newBillBtn">+ Create New Bill</button>
-            <button id="manageBillsBtn" style="background: transparent; color: var(--primary); border: 2px solid var(--primary);">Manage All Bills</button>
+            <button id="manageBillsBtn"
+                style="background: transparent; color: var(--primary); border: 2px solid var(--primary);">Manage All
+                Bills</button>
         </div>
 
         <!-- Dashboard Section -->
@@ -433,7 +571,7 @@
         <div id="billForm">
             <h3 class="form-section-title" id="formTitle">New Invoice Details</h3>
             <input type="hidden" id="editTransactionId">
-            
+
             <div class="form-row">
                 <div class="form-group">
                     <label>Invoice Date</label>
@@ -444,7 +582,7 @@
                     <input type="text" id="billNo" placeholder="e.g. 2279">
                 </div>
             </div>
-            
+
             <div class="form-row">
                 <div class="form-group">
                     <label>Client Name</label>
@@ -470,7 +608,8 @@
                     </thead>
                     <tbody id="itemsBody">
                         <tr>
-                            <td><input type="text" class="article-input" placeholder="e.g. Handmade Silk Scarf" style="min-width: 200px;"></td>
+                            <td><input type="text" class="article-input" placeholder="e.g. Handmade Silk Scarf"
+                                    style="min-width: 200px;"></td>
                             <td><input type="number" class="qty-input" value="1" min="1"></td>
                             <td><input type="number" class="price-input" value="0" min="0"></td>
                             <td><input type="text" class="row-total" value="0.00" readonly></td>
@@ -500,12 +639,14 @@
                 <button id="newPurchaseBtn" style="margin: 0;">+ Log New Stock</button>
             </div>
 
-            <div id="purchaseForm" style="display: none; background: var(--white); padding: 2.5rem; border: 1px solid var(--border); margin-bottom: 3rem; border-radius: 4px;">
+            <div id="purchaseForm"
+                style="display: none; background: var(--white); padding: 2.5rem; border: 1px solid var(--border); margin-bottom: 3rem; border-radius: 4px;">
                 <h4 style="margin-top: 0; margin-bottom: 2rem;">Purchase Entry</h4>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Supplier</label>
-                        <select id="purchaseSupplier" style="width: 100%; height: 48px; font-family: Merriweather; border: 1px solid var(--border); background: #fafafa;"></select>
+                        <select id="purchaseSupplier"
+                            style="width: 100%; height: 48px; font-family: Merriweather; border: 1px solid var(--border); background: #fafafa;"></select>
                     </div>
                     <div class="form-group">
                         <label>Purchase Date</label>
@@ -539,14 +680,16 @@
                     </div>
                     <div class="form-group">
                         <label>Payment Mode</label>
-                        <select id="purchasePaymentMode" style="width: 100%; height: 48px; border: 1px solid var(--border); background: #fafafa;">
+                        <select id="purchasePaymentMode"
+                            style="width: 100%; height: 48px; border: 1px solid var(--border); background: #fafafa;">
                             <option value="Cash">Cash</option>
                             <option value="Online">Online / Bank Transfer</option>
                         </select>
                     </div>
                 </div>
                 <div class="actions" style="margin-top: 1rem;">
-                    <button type="button" class="btn-cancel" onclick="document.getElementById('purchaseForm').style.display='none'">Cancel</button>
+                    <button type="button" class="btn-cancel"
+                        onclick="document.getElementById('purchaseForm').style.display='none'">Cancel</button>
                     <button type="button" id="submitPurchase" class="btn-submit">Record Purchase</button>
                 </div>
             </div>
@@ -572,7 +715,8 @@
                 <button id="addSupplierBtn" style="margin: 0;">+ New Supplier</button>
             </div>
 
-            <div id="supplierForm" style="display: none; background: var(--white); padding: 2.5rem; border: 1px solid var(--border); margin-bottom: 3rem; border-radius: 4px;">
+            <div id="supplierForm"
+                style="display: none; background: var(--white); padding: 2.5rem; border: 1px solid var(--border); margin-bottom: 3rem; border-radius: 4px;">
                 <div class="form-row">
                     <div class="form-group">
                         <label>Supplier Name</label>
@@ -588,7 +732,8 @@
                     <input type="text" id="supAddress">
                 </div>
                 <div class="actions" style="margin-top: 1rem;">
-                    <button type="button" class="btn-cancel" onclick="document.getElementById('supplierForm').style.display='none'">Cancel</button>
+                    <button type="button" class="btn-cancel"
+                        onclick="document.getElementById('supplierForm').style.display='none'">Cancel</button>
                     <button type="button" id="saveSupplier" class="btn-submit">Save Supplier</button>
                 </div>
             </div>
@@ -611,12 +756,13 @@
         <div class="success-card">
             <h2>Invoice Recorded!</h2>
             <p id="modalBillInfo"></p>
-            
+
             <div class="modal-actions">
                 <a id="waLink" href="#" target="_blank" class="btn-whatsapp">
                     Send to WhatsApp
                 </a>
-                <button type="button" id="downloadPdfBtn" class="btn-add-item" style="width: 100%; padding: 16px; margin: 0; border-width: 1px;">
+                <button type="button" id="downloadPdfBtn" class="btn-add-item"
+                    style="width: 100%; padding: 16px; margin: 0; border-width: 1px;">
                     Download PDF Invoice
                 </button>
                 <button type="button" id="closeModalBtn" class="btn-close-modal">
@@ -626,20 +772,20 @@
         </div>
     </div>
 
-<script>
+    <script>
         // DOM Elements
         const dashboard = document.getElementById('dashboard');
         const billForm = document.getElementById('billForm');
         const manageBillsView = document.getElementById('manageBillsView');
         const purchasesView = document.getElementById('purchasesView');
         const suppliersView = document.getElementById('suppliersView');
-        
+
         const navDashboard = document.getElementById('navDashboard');
         const navNewBill = document.getElementById('navNewBill');
         const navManageBills = document.getElementById('navManageBills');
         const navPurchases = document.getElementById('navPurchases');
         const navSuppliers = document.getElementById('navSuppliers');
-        
+
         const newBillBtn = document.getElementById('newBillBtn');
         const manageBillsBtn = document.getElementById('manageBillsBtn');
         const itemsBody = document.getElementById('itemsBody');
@@ -659,7 +805,7 @@
                 document.getElementById('formTitle').innerText = 'New Invoice Details';
                 document.getElementById('editTransactionId').value = '';
                 resetForm();
-                
+
                 const now = new Date();
                 now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
                 document.getElementById('billDate').value = now.toISOString().slice(0, 16);
@@ -705,7 +851,7 @@
         navManageBills.addEventListener('click', (e) => { e.preventDefault(); showView('manage'); });
         navPurchases.addEventListener('click', (e) => { e.preventDefault(); showView('purchases'); });
         navSuppliers.addEventListener('click', (e) => { e.preventDefault(); showView('suppliers'); });
-        
+
         newBillBtn.addEventListener('click', () => showView('form'));
         manageBillsBtn.addEventListener('click', () => showView('manage'));
 
@@ -715,7 +861,7 @@
                 const response = await fetch('/api/dashboard');
                 if (!response.ok) throw new Error('Dashboard fetch failed');
                 const data = await response.json();
-                
+
                 // Update Summary
                 document.getElementById('monthSales').innerText = `₹${parseFloat(data.summary.current_month_total || 0).toFixed(2)}`;
                 document.getElementById('lastMonthSales').innerText = `₹${parseFloat(data.summary.last_month_total || 0).toFixed(2)}`;
@@ -728,14 +874,14 @@
                 // Update Recent Bills
                 const recentBody = document.getElementById('recentBillsBody');
                 recentBody.innerHTML = '';
-                
+
                 if (data.recentBills && data.recentBills.length > 0) {
                     data.recentBills.forEach(bill => {
                         const row = document.createElement('tr');
                         const date = new Date(bill.bill_date).toLocaleDateString(undefined, {
                             year: 'numeric', month: 'short', day: 'numeric'
                         });
-                        
+
                         const tId = bill.transaction_id;
                         const cName = bill.customer_name || 'Walk-in';
                         const bNo = bill.bill_no || '-';
@@ -768,7 +914,7 @@
                 const bills = await response.json();
                 const body = document.getElementById('allBillsBody');
                 body.innerHTML = '';
-                
+
                 bills.forEach(bill => {
                     const row = document.createElement('tr');
                     const date = new Date(bill.bill_date).toLocaleDateString(undefined, {
@@ -806,15 +952,15 @@
                     throw new Error(errorData.error || 'Failed to fetch bill details');
                 }
                 const bill = await response.json();
-                
+
                 showView('form');
                 document.getElementById('formTitle').innerText = 'Edit Invoice Details';
                 document.getElementById('editTransactionId').value = transactionId;
-                
+
                 document.getElementById('custName').value = bill.customerName || 'Walk-in';
                 document.getElementById('custMobile').value = bill.customerMobile || '';
                 document.getElementById('billNo').value = bill.billNo || '';
-                
+
                 if (bill.billDate) {
                     const billDate = new Date(bill.billDate);
                     if (!isNaN(billDate.getTime())) {
@@ -822,7 +968,7 @@
                         document.getElementById('billDate').value = billDate.toISOString().slice(0, 16);
                     }
                 }
-                
+
                 itemsBody.innerHTML = '';
                 if (bill.items && bill.items.length > 0) {
                     bill.items.forEach((item, index) => {
@@ -839,7 +985,7 @@
                 } else {
                     resetForm(); // Fallback if no items
                 }
-                
+
                 calculateTotals();
             } catch (err) {
                 console.error('Error editing bill:', err);
@@ -854,7 +1000,7 @@
                 return;
             }
             if (!confirm('Are you sure you want to delete this bill? This action cannot be undone.')) return;
-            
+
             try {
                 const response = await fetch(`/api/bills/${transactionId}`, { method: 'DELETE' });
                 if (response.ok) {
@@ -871,102 +1017,190 @@
             }
         }
 
-    async function downloadInvoicePDF(transactionId) {
-        console.log('Generating PDF for:', transactionId);
-        if (!transactionId || transactionId === 'undefined' || transactionId === 'null') {
-            alert('Error: Invalid Bill ID');
-            return;
+        async function downloadInvoicePDF(transactionId) {
+            console.log('Generating PDF for:', transactionId);
+            if (!transactionId || transactionId === 'undefined' || transactionId === 'null') {
+                alert('Error: Invalid Bill ID');
+                return;
+            }
+            try {
+                const response = await fetch(`/api/bills/${transactionId}`);
+                if (!response.ok) throw new Error('Bill not found on server');
+                const bill = await response.json();
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+                const pageW = 210;
+                const pageH = 297;
+                const margin = 14;
+                const rightEdge = pageW - margin;    // 196
+                const contentW = rightEdge - margin; // 182
+                let y = 0;
+
+                // ── Header bar ──────────────────────────────────────────────
+                doc.setFillColor(44, 62, 80);
+                doc.rect(0, 0, pageW, 30, 'F');
+
+                // Load Logo
+                const logoImg = new Image();
+                logoImg.src = "/public/logo.png";
+                await new Promise((res) => {
+                    logoImg.onload = res;
+                    logoImg.onerror = res;
+                });
+                if (logoImg.complete && logoImg.naturalWidth > 0) {
+                    const logoH = 20;
+                    const logoW = (logoImg.naturalWidth / logoImg.naturalHeight) * logoH;
+                    doc.addImage(logoImg, "PNG", margin, 5, logoW, logoH);
+                }
+
+                doc.setTextColor(212, 175, 55);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(24);
+                doc.text("INVOICE", pageW / 2 + 15, 14, { align: "center" });
+
+                doc.setTextColor(255, 255, 255);
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(9);
+                doc.text("thanks for choosing Ethnic Vogue by Priya", pageW / 2 + 15, 22, { align: "center" });
+
+                y = 40;
+
+                // ── Bill To (left) + Invoice Details (right) ────────────────
+                doc.setTextColor(150, 150, 150);
+                doc.setFontSize(7.5);
+                doc.setFont('helvetica', 'bold');
+                doc.text('BILL TO', margin, y);
+                doc.text('INVOICE DETAILS', rightEdge, y, { align: 'right' });
+
+                y += 6;
+                doc.setTextColor(30, 30, 30);
+                doc.setFontSize(13);
+                doc.setFont('helvetica', 'bold');
+                doc.text(bill.customerName || 'Walk-in', margin, y);
+
+                // Right column: label left-aligned at x=130, value right-aligned at rightEdge
+                const billDate = bill.billDate
+                    ? new Date(bill.billDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                    : '-';
+                const labelX = 130;
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(100, 100, 100);
+                doc.text('Bill No:', labelX, y);
+                doc.setTextColor(30, 30, 30);
+                doc.setFont('helvetica', 'bold');
+                doc.text(String(bill.billNo || '-'), rightEdge, y, { align: 'right' });
+
+                y += 6;
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(80, 80, 80);
+                if (bill.customerMobile) {
+                    doc.text(bill.customerMobile, margin, y);
+                }
+                doc.setTextColor(100, 100, 100);
+                doc.text('Date:', labelX, y);
+                doc.setTextColor(30, 30, 30);
+                doc.text(billDate, rightEdge, y, { align: 'right' });
+
+                y += 14;
+
+                // ── Gold divider ─────────────────────────────────────────────
+                doc.setDrawColor(212, 175, 55);
+                doc.setLineWidth(0.7);
+                doc.line(margin, y, rightEdge, y);
+                y += 8;
+
+                // ── Table columns: Article | Qty | Rate | Total ──────────────
+                // Fixed right edges for each column (so numbers right-align cleanly)
+                const col = {
+                    articleL: margin,          // article text starts here
+                    articleR: margin + 95,     // article col right edge
+                    qtyC: margin + 112,    // qty center
+                    rateR: margin + 152,    // rate col right edge
+                    totalR: rightEdge,       // total col right edge (196)
+                };
+                const rowH = 9;
+
+                // Table header background
+                doc.setFillColor(44, 62, 80);
+                doc.rect(margin, y - 5, contentW, rowH, 'F');
+
+                doc.setTextColor(255, 255, 255);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(8.5);
+                doc.text('ARTICLE', col.articleL + 2, y);
+                doc.text('QTY', col.qtyC, y, { align: 'center' });
+                doc.text('RATE (Rs.)', col.rateR, y, { align: 'right' });
+                doc.text('TOTAL (Rs.)', col.totalR, y, { align: 'right' });
+
+                y += rowH;
+
+                // ── Table rows ───────────────────────────────────────────────
+                doc.setFontSize(9);
+                const items = bill.items || [];
+                items.forEach((item, i) => {
+                    // Zebra stripe on even rows
+                    if (i % 2 === 0) {
+                        doc.setFillColor(247, 247, 245);
+                        doc.rect(margin, y - 5.5, contentW, rowH, 'F');
+                    }
+
+                    doc.setTextColor(30, 30, 30);
+                    doc.setFont('helvetica', 'normal');
+
+                    // Article — truncate if too long
+                    const articleStr = doc.splitTextToSize(item.article || '-', col.articleR - col.articleL - 3)[0];
+                    doc.text(articleStr, col.articleL + 2, y);
+
+                    doc.text(String(item.pieces || 0), col.qtyC, y, { align: 'center' });
+
+                    doc.text(parseFloat(item.pricePerPiece || 0).toFixed(2), col.rateR, y, { align: 'right' });
+
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(parseFloat(item.total || 0).toFixed(2), col.totalR, y, { align: 'right' });
+
+                    y += rowH;
+                });
+
+                // ── Separator ────────────────────────────────────────────────
+                y += 2;
+                doc.setDrawColor(212, 175, 55);
+                doc.setLineWidth(0.5);
+                doc.line(margin, y, rightEdge, y);
+
+                // ── Grand Total box ──────────────────────────────────────────
+                y += 4;
+                const gtBoxW = 80;
+                const gtBoxH = 14;
+                doc.setFillColor(44, 62, 80);
+                doc.rect(rightEdge - gtBoxW, y, gtBoxW, gtBoxH, 'F');
+
+                doc.setTextColor(180, 180, 180);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.text('GRAND TOTAL', rightEdge - gtBoxW + 4, y + 5.5);
+
+                doc.setTextColor(212, 175, 55);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(12);
+                doc.text(`Rs. ${parseFloat(bill.grandTotal || 0).toFixed(2)}`, rightEdge - 3, y + 9.5, { align: 'right' });
+
+                // ── Footer ───────────────────────────────────────────────────
+                y += gtBoxH + 16;
+                doc.setDrawColor(220, 220, 220);
+                doc.setLineWidth(0.3);
+                doc.line(margin, y, rightEdge, y);
+
+                y += 7;
+                doc.save(`Invoice_${bill.billNo || transactionId.slice(0, 8)}.pdf`);
+
+            } catch (err) {
+                console.error('PDF Error:', err);
+                alert('Failed to download PDF: ' + err.message);
+            }
         }
-        try {
-            const response = await fetch(`/api/bills/${transactionId}`);
-            if (!response.ok) throw new Error('Bill not found on server');
-            const bill = await response.json();
-
-            // FIX #2: Use visibility:hidden + position:absolute instead of left:-10000px
-            const tempContainer = document.createElement('div');
-            tempContainer.style.position = 'absolute';
-            tempContainer.style.top = '0';
-            tempContainer.style.left = '0';
-            tempContainer.style.visibility = 'hidden';
-            tempContainer.style.width = '700px';
-            tempContainer.style.background = 'white';
-            document.body.appendChild(tempContainer);
-
-            // FIX #1: Replace ₹ with "Rs." for PDF compatibility
-            const rs = 'Rs.';
-
-            tempContainer.innerHTML = `
-                <div style="padding: 40px; font-family: Arial, sans-serif; color: #333; background: white;">
-                    <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px;">
-                        <h1 style="margin: 0; font-size: 28px; text-transform: uppercase;">Invoice</h1>
-                        <p style="margin: 5px 0; font-size: 14px; color: #666;">Professional Billing System</p>
-                    </div>
-
-                    <div style="margin-bottom: 30px;">
-                        <table style="width: 100%;">
-                            <tr>
-                                <td style="width: 50%; vertical-align: top;">
-                                    <p style="margin: 0; color: #888; font-size: 10px; text-transform: uppercase;">Bill To:</p>
-                                    <p style="margin: 2px 0; font-size: 18px; font-weight: bold;">${bill.customerName || 'Walk-in'}</p>
-                                    <p style="margin: 2px 0; color: #555;">${bill.customerMobile || '-'}</p>
-                                </td>
-                                <td style="width: 50%; text-align: right; vertical-align: top;">
-                                    <p style="margin: 0;"><strong>Bill No:</strong> ${bill.billNo || '-'}</p>
-                                    <p style="margin: 5px 0;"><strong>Date:</strong> ${new Date(bill.billDate).toLocaleDateString()}</p>
-                                </td>
-                            </tr>
-                        </table>
-                    </div>
-
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
-                        <thead>
-                            <tr style="background: #f0f0f0;">
-                                <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Article</th>
-                                <th style="padding: 12px; text-align: center; border: 1px solid #ddd; width: 60px;">Qty</th>
-                                <th style="padding: 12px; text-align: right; border: 1px solid #ddd; width: 120px;">Price (${rs})</th>
-                                <th style="padding: 12px; text-align: right; border: 1px solid #ddd; width: 120px;">Total (${rs})</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${(bill.items || []).map(item => `
-                                <tr>
-                                    <td style="padding: 12px; border: 1px solid #ddd;">${item.article || '-'}</td>
-                                    <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">${item.pieces || 0}</td>
-                                    <td style="padding: 12px; border: 1px solid #ddd; text-align: right;">${parseFloat(item.pricePerPiece || 0).toFixed(2)}</td>
-                                    <td style="padding: 12px; border: 1px solid #ddd; text-align: right; font-weight: bold;">${parseFloat(item.total || 0).toFixed(2)}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                        <tfoot>
-                            <tr style="background: #f9f9f9;">
-                                <td colspan="3" style="padding: 15px; text-align: right; border: 1px solid #ddd; font-weight: bold;">Grand Total:</td>
-                                <td style="padding: 15px; text-align: right; border: 1px solid #ddd; font-weight: bold; font-size: 18px;">${rs} ${parseFloat(bill.grandTotal || 0).toFixed(2)}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-
-                    <div style="text-align: center; margin-top: 50px; border-top: 1px solid #eee; padding-top: 20px; color: #999; font-size: 11px;">
-                        <p>Thank you for choosing us!</p>
-                    </div>
-                </div>
-            `;
-
-            const options = {
-                margin: 10,
-                filename: `Bill_${bill.billNo || 'Record'}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, logging: false },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-
-            await html2pdf().set(options).from(tempContainer).save();
-            document.body.removeChild(tempContainer);
-
-        } catch (err) {
-            console.error('PDF Error:', err);
-            alert('Failed to download PDF: ' + err.message);
-        }
-    }
 
         // WhatsApp Integration Logic
         function formatWhatsAppMessage(name, billNo, items, total) {
@@ -979,7 +1213,6 @@
                 message += `- ${item.article}: ${item.pieces} x ₹${item.pricePerPiece} = *₹${item.total}*\n`;
             });
             message += `\n*Grand Total: ₹${total.toFixed(2)}*\n\n`;
-            message += `Thank you for your business! ✨`;
             return encodeURIComponent(message);
         }
 
@@ -988,13 +1221,13 @@
             const infoText = document.getElementById('modalBillInfo');
             const waLink = document.getElementById('waLink');
             const downloadPdfBtn = document.getElementById('downloadPdfBtn');
-            
+
             infoText.innerText = `Successfully recorded invoice for ${name} (Total: ₹${total.toFixed(2)})`;
-            
+
             if (mobile) {
                 let cleanMobile = mobile.replace(/\D/g, '');
                 if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
-                
+
                 const encodedMsg = formatWhatsAppMessage(name, billNo, items, total);
                 waLink.href = `https://wa.me/${cleanMobile}?text=${encodedMsg}`;
                 waLink.style.display = 'block';
@@ -1003,7 +1236,7 @@
             }
 
             downloadPdfBtn.onclick = () => downloadInvoicePDF(transactionId);
-            
+
             modal.style.display = 'flex';
             // Scroll to top of modal for small screens
             modal.scrollTop = 0;
@@ -1044,7 +1277,7 @@
             const address = document.getElementById('supAddress').value;
             await fetch('/api/suppliers', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, mobile, address })
             });
             document.getElementById('supplierForm').style.display = 'none';
@@ -1073,7 +1306,7 @@
         // Auto-calculate Purchase Total
         ['purchaseBase', 'purchaseGst'].forEach(id => {
             const el = document.getElementById(id);
-            if(el) {
+            if (el) {
                 el.addEventListener('input', () => {
                     const base = parseFloat(document.getElementById('purchaseBase').value) || 0;
                     const gst = parseFloat(document.getElementById('purchaseGst').value) || 0;
@@ -1093,12 +1326,12 @@
                 payment_mode: document.getElementById('purchasePaymentMode').value,
                 purchase_date: document.getElementById('purchaseDate').value
             };
-            
-            if(!data.supplier_id || !data.article_name) { alert("Please fill all fields"); return; }
+
+            if (!data.supplier_id || !data.article_name) { alert("Please fill all fields"); return; }
 
             await fetch('/api/purchases', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
             document.getElementById('purchaseForm').style.display = 'none';
@@ -1108,7 +1341,7 @@
         function calculateTotals() {
             let grandTotal = 0;
             const rows = itemsBody.querySelectorAll('tr');
-            
+
             rows.forEach(row => {
                 const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
                 const price = parseFloat(row.querySelector('.price-input').value) || 0;
@@ -1116,7 +1349,7 @@
                 row.querySelector('.row-total').value = total.toFixed(2);
                 grandTotal += total;
             });
-            
+
             grandTotalDisplay.innerText = `₹${grandTotal.toFixed(2)}`;
         }
 
@@ -1173,7 +1406,7 @@
             try {
                 btn.disabled = true;
                 btn.innerText = 'Recording...';
-                
+
                 const response = await fetch('/api/bills', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1213,4 +1446,7 @@
         });
 
         window.addEventListener('load', loadDashboard);
-    </script></body></html>
+    </script>
+</body>
+
+</html>
