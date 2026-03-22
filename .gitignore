@@ -1,1 +1,5 @@
 server*.log
+backup.json
+export_data.js
+import_data_koyeb.js
+.env

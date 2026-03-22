@@ -14,9 +14,17 @@ app.use((req, res, next) => {
 // Database connection
 const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
 console.log('DATABASE_URL length:', dbUrl ? dbUrl.length : 'undefined');
-const pool = new Pool({
+
+// SSL configuration (needed for Koyeb and external Postgres)
+const poolConfig = {
   connectionString: dbUrl,
-});
+};
+
+if (dbUrl && (dbUrl.includes('proxy.rlwy.net') || dbUrl.includes('koyeb.app') || process.env.NODE_ENV === 'production')) {
+  poolConfig.ssl = { rejectUnauthorized: false };
+}
+
+const pool = new Pool(poolConfig);
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
@@ -375,3 +383,5 @@ app.use((req, res) => {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
+module.exports = app;

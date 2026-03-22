@@ -1188,12 +1188,30 @@
                 doc.text(`Rs. ${parseFloat(bill.grandTotal || 0).toFixed(2)}`, rightEdge - 3, y + 9.5, { align: 'right' });
 
                 // ── Footer ───────────────────────────────────────────────────
-                y += gtBoxH + 16;
+                y += gtBoxH + 12;
                 doc.setDrawColor(220, 220, 220);
                 doc.setLineWidth(0.3);
                 doc.line(margin, y, rightEdge, y);
 
-                y += 7;
+                y += 6;
+                doc.setFontSize(7);
+                doc.setTextColor(100, 100, 100);
+                doc.setFont('helvetica', 'bold');
+                doc.text('TERMS & CONDITIONS:', margin, y);
+
+                y += 4;
+                doc.setFont('helvetica', 'normal');
+                const terms = [
+                    "1. No return or exchange",
+                    "2. No guarantee after wash",
+                    "3. Pls notify about any manufacturing defect within 3 days",
+                    "4. Subject to Surat jurisdiction"
+                ];
+                terms.forEach(term => {
+                    doc.text(term, margin, y);
+                    y += 3.5;
+                });
+
                 doc.save(`Invoice_${bill.billNo || transactionId.slice(0, 8)}.pdf`);
 
             } catch (err) {
