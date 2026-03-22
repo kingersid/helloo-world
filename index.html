@@ -486,13 +486,13 @@
     <header class="header">
         <div style="display: flex; align-items: center; justify-content: space-between; width: 90%; max-width: 1200px;">
             <img src="assets/logo.png" alt="Logo" class="logo">
-            <div style="text-align: right; font-size: 0.85rem; color: var(--primary);">
+            <div style="text-align: right; font-size: clamp(0.7rem, 2vw, 0.85rem); color: var(--primary);">
                 <div style="display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin-bottom: 4px;">
-                    <img src="https://cdn-icons-png.flaticon.com/16/174/174855.png" width="14" height="14" alt="insta">
+                    <img src="https://cdn-icons-png.flaticon.com/16/174/174855.png" width="14" height="14" alt="insta" style="width: 1.2em; height: 1.2em;">
                     <span>label.ethnicvogue</span>
                 </div>
                 <div style="display: flex; align-items: center; justify-content: flex-end; gap: 5px;">
-                    <img src="https://cdn-icons-png.flaticon.com/16/159/159832.png" width="14" height="14" alt="phone">
+                    <img src="https://cdn-icons-png.flaticon.com/16/159/159832.png" width="14" height="14" alt="phone" style="width: 1.2em; height: 1.2em;">
                     <span>Priya Kinger: 9537097267</span>
                 </div>
             </div>
@@ -1043,6 +1043,11 @@
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
 
+                // Responsive sizing logic for PDF readability
+                const screenW = window.innerWidth;
+                const scale = screenW < 480 ? 1.35 : (screenW < 768 ? 1.15 : 1.0);
+                const fs = (size) => size * scale;
+
                 const pageW = 210;
                 const pageH = 297;
                 const margin = 14;
@@ -1069,26 +1074,26 @@
 
                 doc.setTextColor(212, 175, 55);
                 doc.setFont("helvetica", "bold");
-                doc.setFontSize(24);
+                doc.setFontSize(fs(24));
                 doc.text("INVOICE", pageW / 2 + 15, 14, { align: "center" });
 
                 doc.setTextColor(255, 255, 255);
                 doc.setFont("helvetica", "normal");
-                doc.setFontSize(9);
+                doc.setFontSize(fs(9));
                 doc.text("thanks for choosing Ethnic Vogue by Priya", pageW / 2 + 15, 22, { align: "center" });
 
                 y = 40;
 
                 // ── Bill To (left) + Invoice Details (right) ────────────────
                 doc.setTextColor(150, 150, 150);
-                doc.setFontSize(7.5);
+                doc.setFontSize(fs(7.5));
                 doc.setFont('helvetica', 'bold');
                 doc.text('BILL TO', margin, y);
                 doc.text('INVOICE DETAILS', rightEdge, y, { align: 'right' });
 
-                y += 6;
+                y += 6 * scale;
                 doc.setTextColor(30, 30, 30);
-                doc.setFontSize(13);
+                doc.setFontSize(fs(13));
                 doc.setFont('helvetica', 'bold');
                 doc.text(bill.customerName || 'Walk-in', margin, y);
 
@@ -1097,7 +1102,7 @@
                     ? new Date(bill.billDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                     : '-';
                 const labelX = 130;
-                doc.setFontSize(9);
+                doc.setFontSize(fs(9));
                 doc.setFont('helvetica', 'normal');
                 doc.setTextColor(100, 100, 100);
                 doc.text('Bill No:', labelX, y);
@@ -1105,7 +1110,7 @@
                 doc.setFont('helvetica', 'bold');
                 doc.text(String(bill.billNo || '-'), rightEdge, y, { align: 'right' });
 
-                y += 6;
+                y += 6 * scale;
                 doc.setFont('helvetica', 'normal');
                 doc.setTextColor(80, 80, 80);
                 if (bill.customerMobile) {
@@ -1116,13 +1121,13 @@
                 doc.setTextColor(30, 30, 30);
                 doc.text(billDate, rightEdge, y, { align: 'right' });
 
-                y += 14;
+                y += 14 * scale;
 
                 // ── Gold divider ─────────────────────────────────────────────
                 doc.setDrawColor(212, 175, 55);
                 doc.setLineWidth(0.7);
                 doc.line(margin, y, rightEdge, y);
-                y += 8;
+                y += 8 * scale;
 
                 // ── Table columns: Article | Qty | Rate | Total ──────────────
                 // Fixed right edges for each column (so numbers right-align cleanly)
@@ -1133,15 +1138,15 @@
                     rateR: margin + 152,    // rate col right edge
                     totalR: rightEdge,       // total col right edge (196)
                 };
-                const rowH = 9;
+                const rowH = 9 * scale;
 
                 // Table header background
                 doc.setFillColor(44, 62, 80);
-                doc.rect(margin, y - 5, contentW, rowH, 'F');
+                doc.rect(margin, y - (5 * scale), contentW, rowH, 'F');
 
                 doc.setTextColor(255, 255, 255);
                 doc.setFont('helvetica', 'bold');
-                doc.setFontSize(8.5);
+                doc.setFontSize(fs(8.5));
                 doc.text('ARTICLE', col.articleL + 2, y);
                 doc.text('QTY', col.qtyC, y, { align: 'center' });
                 doc.text('RATE (Rs.)', col.rateR, y, { align: 'right' });
@@ -1150,13 +1155,13 @@
                 y += rowH;
 
                 // ── Table rows ───────────────────────────────────────────────
-                doc.setFontSize(9);
+                doc.setFontSize(fs(9));
                 const items = bill.items || [];
                 items.forEach((item, i) => {
                     // Zebra stripe on even rows
                     if (i % 2 === 0) {
                         doc.setFillColor(247, 247, 245);
-                        doc.rect(margin, y - 5.5, contentW, rowH, 'F');
+                        doc.rect(margin, y - (5.5 * scale), contentW, rowH, 'F');
                     }
 
                     doc.setTextColor(30, 30, 30);
@@ -1177,47 +1182,47 @@
                 });
 
                 // ── Separator ────────────────────────────────────────────────
-                y += 2;
+                y += 2 * scale;
                 doc.setDrawColor(212, 175, 55);
                 doc.setLineWidth(0.5);
                 doc.line(margin, y, rightEdge, y);
 
                 // ── Grand Total box ──────────────────────────────────────────
-                y += 4;
+                y += 4 * scale;
                 const gtBoxW = 80;
-                const gtBoxH = 14;
+                const gtBoxH = 14 * scale;
                 doc.setFillColor(44, 62, 80);
                 doc.rect(rightEdge - gtBoxW, y, gtBoxW, gtBoxH, 'F');
 
                 doc.setTextColor(180, 180, 180);
                 doc.setFont('helvetica', 'normal');
-                doc.setFontSize(8);
-                doc.text('GRAND TOTAL', rightEdge - gtBoxW + 4, y + 5.5);
+                doc.setFontSize(fs(8));
+                doc.text('GRAND TOTAL', rightEdge - gtBoxW + 4, y + (5.5 * scale));
 
                 doc.setTextColor(212, 175, 55);
                 doc.setFont('helvetica', 'bold');
-                doc.setFontSize(12);
-                doc.text(`Rs. ${parseFloat(bill.grandTotal || 0).toFixed(2)}`, rightEdge - 3, y + 9.5, { align: 'right' });
+                doc.setFontSize(fs(12));
+                doc.text(`Rs. ${parseFloat(bill.grandTotal || 0).toFixed(2)}`, rightEdge - 3, y + (9.5 * scale), { align: 'right' });
 
                 // ── Footer ───────────────────────────────────────────────────
-                y += gtBoxH + 12;
+                y += gtBoxH + (12 * scale);
                 doc.setDrawColor(220, 220, 220);
                 doc.setLineWidth(0.3);
                 doc.line(margin, y, rightEdge, y);
 
-                y += 6;
-                doc.setFontSize(8);
+                y += 6 * scale;
+                doc.setFontSize(fs(8));
                 doc.setTextColor(44, 62, 80);
                 doc.setFont('helvetica', 'bold');
                 doc.text('Hope to see you again soon!', pageW / 2, y, { align: 'center' });
-                y += 4;
-                doc.setFontSize(7);
+                y += 4 * scale;
+                doc.setFontSize(fs(7));
                 doc.setFont('helvetica', 'normal');
                 doc.text('Pls share about us with your friends and family.', pageW / 2, y, { align: 'center' });
 
                 // Social info in header
                 doc.setTextColor(255, 255, 255);
-                doc.setFontSize(7);
+                doc.setFontSize(fs(7));
                 
                 // Instagram icon & handle
                 const instaHandle = 'label.ethnicvogue';

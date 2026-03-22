@@ -93,8 +93,29 @@ const initDB = async (retries = 5) => {
             image_url TEXT,
             category TEXT,
             stock_quantity INTEGER DEFAULT 0,
+            fabric TEXT,
+            size_options TEXT, -- comma separated like 'M,L,XL,UNSTITCHED'
+            garment_details TEXT,
+            care_instructions TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
+
+          -- Migration: Add new columns if they don't exist
+          DO $$ 
+          BEGIN 
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products' AND column_name='fabric') THEN
+              ALTER TABLE products ADD COLUMN fabric TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products' AND column_name='size_options') THEN
+              ALTER TABLE products ADD COLUMN size_options TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products' AND column_name='garment_details') THEN
+              ALTER TABLE products ADD COLUMN garment_details TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products' AND column_name='care_instructions') THEN
+              ALTER TABLE products ADD COLUMN care_instructions TEXT;
+            END IF;
+          END $$;
 
           CREATE TABLE IF NOT EXISTS ecommerce_orders (
             id SERIAL PRIMARY KEY,
@@ -430,12 +451,25 @@ app.get('/api/products', async (req, res) => {
 });
 
 app.post('/api/products', async (req, res) => {
-  const { name, description, price, image_url, category, stock_quantity } = req.body;
+  const { name, description, price, image_url, category, stock_quantity, fabric, size_options, garment_details, care_instructions } = req.body;
   try {
     const result = await pool.query(
-      'INSERT INTO products (name, description, price, image_url, category, stock_quantity) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [name, description, price, image_url, category, stock_quantity]
+      'INSERT INTO products (name, description, price, image_url, category, stock_quantity, fabric, size_options, garment_details, care_instructions) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+      [name, description, price, image_url, category, stock_quantity, fabric, size_options, garment_details, care_instructions]
     );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/products/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
