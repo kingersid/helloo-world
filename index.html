@@ -485,7 +485,7 @@
 
     <header class="header">
         <img src="assets/logo.png" alt="Logo" class="logo">
-        <h1>Welcome to Billing!</h1>
+        <h1 id="greeting">Welcome to Billing!</h1>
     </header>
 
     <div class="container" style="margin-top: 3rem;">
@@ -1463,7 +1463,24 @@
             }
         });
 
-        window.addEventListener('load', loadDashboard);
+        window.addEventListener('load', () => {
+            updateGreeting();
+            loadDashboard();
+        });
+
+        function updateGreeting() {
+            const now = new Date();
+            const hour = now.getHours();
+            let greeting = "Hi, ";
+            if (hour < 12) {
+                greeting += "Good Morning";
+            } else if (hour < 17) {
+                greeting += "Good Afternoon";
+            } else {
+                greeting += "Good Evening";
+            }
+            document.getElementById('greeting').innerText = greeting;
+        }
     </script>
 </body>
 
