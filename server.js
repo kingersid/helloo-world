@@ -29,6 +29,11 @@ const pool = new Pool(poolConfig);
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
+// Root route to serve index.html explicitly (required for Vercel/some serverless)
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // Initialize database schema
 const initDB = async (retries = 5) => {
   while (retries > 0) {
