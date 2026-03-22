@@ -84,6 +84,36 @@ const initDB = async (retries = 5) => {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
 
+          -- E-commerce Prototype Tables
+          CREATE TABLE IF NOT EXISTS products (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            price DECIMAL(10, 2) NOT NULL,
+            image_url TEXT,
+            category TEXT,
+            stock_quantity INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE TABLE IF NOT EXISTS ecommerce_orders (
+            id SERIAL PRIMARY KEY,
+            customer_name TEXT,
+            customer_mobile TEXT,
+            address TEXT,
+            total_amount DECIMAL(10, 2),
+            status TEXT DEFAULT 'Pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE TABLE IF NOT EXISTS order_items (
+            id SERIAL PRIMARY KEY,
+            order_id INTEGER REFERENCES ecommerce_orders(id),
+            product_id INTEGER REFERENCES products(id),
+            quantity INTEGER,
+            price DECIMAL(10, 2)
+          );
+
           -- Migration: Add bill_date if it doesn't exist
           DO $$ 
           BEGIN 
@@ -377,6 +407,81 @@ app.get('/api/dashboard', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch dashboard' });
   } finally {
     client.release();
+  }
+});
+
+// Store front routes
+app.get('/store', (req, res) => {
+  res.sendFile(path.join(__dirname, 'store.html'));
+});
+
+app.get('/admin-store', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin_store.html'));
+});
+
+// E-commerce API Routes
+app.get('/api/products', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/products', async (req, res) => {
+  const { name, description, price, image_url, category, stock_quantity } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO products (name, description, price, image_url, category, stock_quantity) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [name, description, price, image_url, category, stock_quantity]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/orders', async (req, res) => {
+  const { customer_name, customer_mobile, address, items, total_amount } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const orderResult = await client.query(
+      'INSERT INTO ecommerce_orders (customer_name, customer_mobile, address, total_amount) VALUES ($1, $2, $3, $4) RETURNING id',
+      [customer_name, customer_mobile, address, total_amount]
+    );
+    const orderId = orderResult.rows[0].id;
+
+    for (const item of items) {
+      await client.query(
+        'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4)',
+        [orderId, item.product_id, item.quantity, item.price]
+      );
+      // Update stock
+      await client.query('UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2', [item.quantity, item.product_id]);
+    }
+    await client.query('COMMIT');
+    res.json({ success: true, orderId });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.get('/api/orders', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT o.*, 
+             (SELECT json_agg(json_build_object('name', p.name, 'quantity', oi.quantity, 'price', oi.price))
+              FROM order_items oi JOIN products p ON oi.product_id = p.id WHERE oi.order_id = o.id) as items
+      FROM ecommerce_orders o ORDER BY o.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

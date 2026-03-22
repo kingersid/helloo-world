@@ -484,7 +484,19 @@
     </nav>
 
     <header class="header">
-        <img src="assets/logo.png" alt="Logo" class="logo">
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 90%; max-width: 1200px;">
+            <img src="assets/logo.png" alt="Logo" class="logo">
+            <div style="text-align: right; font-size: 0.85rem; color: var(--primary);">
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin-bottom: 4px;">
+                    <img src="https://cdn-icons-png.flaticon.com/16/174/174855.png" width="14" height="14" alt="insta">
+                    <span>label.ethnicvogue</span>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 5px;">
+                    <img src="https://cdn-icons-png.flaticon.com/16/159/159832.png" width="14" height="14" alt="phone">
+                    <span>Priya Kinger: 9537097267</span>
+                </div>
+            </div>
+        </div>
         <h1 id="greeting">Welcome to Billing!</h1>
     </header>
 
@@ -1194,23 +1206,39 @@
                 doc.line(margin, y, rightEdge, y);
 
                 y += 6;
-                doc.setFontSize(7);
-                doc.setTextColor(100, 100, 100);
+                doc.setFontSize(8);
+                doc.setTextColor(44, 62, 80);
                 doc.setFont('helvetica', 'bold');
-                doc.text('TERMS & CONDITIONS:', margin, y);
-
+                doc.text('Hope to see you again soon!', pageW / 2, y, { align: 'center' });
                 y += 4;
+                doc.setFontSize(7);
                 doc.setFont('helvetica', 'normal');
-                const terms = [
-                    "1. No return or exchange",
-                    "2. No guarantee after wash",
-                    "3. Pls notify about any manufacturing defect within 3 days",
-                    "4. Subject to Surat jurisdiction"
-                ];
-                terms.forEach(term => {
-                    doc.text(term, margin, y);
-                    y += 3.5;
-                });
+                doc.text('Pls share about us with your friends and family.', pageW / 2, y, { align: 'center' });
+
+                // Social info in header
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(7);
+                
+                // Instagram icon & handle
+                const instaHandle = 'label.ethnicvogue';
+                const instaWidth = doc.getTextWidth(instaHandle);
+                const instaIconX = rightEdge - instaWidth - 5;
+                doc.setDrawColor(255, 255, 255);
+                doc.setLineWidth(0.2);
+                doc.roundedRect(instaIconX, 6.2, 3.2, 3.2, 0.8, 0.8, 'D'); // icon outline
+                doc.circle(instaIconX + 1.6, 7.8, 0.8, 'D'); // inner circle
+                doc.text(instaHandle, rightEdge, 8.8, { align: 'right' });
+
+                // Phone icon & contact
+                const phoneText = 'Priya Kinger: 9537097267';
+                const phoneWidth = doc.getTextWidth(phoneText);
+                const phoneIconX = rightEdge - phoneWidth - 5; 
+                doc.setDrawColor(255, 255, 255);
+                doc.setLineWidth(0.25);
+                // Draw a simple mobile phone (rounded rect with screen and home button)
+                doc.roundedRect(phoneIconX, 10.8, 2.4, 4.2, 0.4, 0.4, 'D'); // mobile outline
+                doc.line(phoneIconX + 0.6, 14.2, phoneIconX + 1.8, 14.2); // small home-indicator line
+                doc.text(phoneText, rightEdge, 14.1, { align: 'right' });
 
                 doc.save(`Invoice_${bill.billNo || transactionId.slice(0, 8)}.pdf`);
 
