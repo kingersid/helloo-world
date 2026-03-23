@@ -43,6 +43,15 @@ app.get('/api/config/msg91', (req, res) => {
   });
 });
 
+app.get('/api/auth/test-msg91', async (req, res) => {
+  res.json({
+    authKeyPresent: !!process.env.MSG91_AUTH_KEY,
+    authKeyLength: process.env.MSG91_AUTH_KEY?.length,
+    widgetTokenPresent: !!process.env.MSG91_WIDGET_TOKEN,
+    widgetId: process.env.MSG91_WIDGET_ID
+  });
+});
+
 // Root route to serve index.html explicitly (required for Vercel/some serverless)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
