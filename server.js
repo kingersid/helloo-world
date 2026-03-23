@@ -757,20 +757,28 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 
 app.post('/api/auth/login-mobile-verified', async (req, res) => {
   const { verifiedData } = req.body;
-  // verifiedData should be the access-token from MSG91 Widget
   const accessToken = verifiedData;
 
   if (!accessToken) return res.status(400).json({ error: 'Access token required' });
 
   try {
-    // 1. Verify the token with MSG91
+    // 1. Verify the token with MSG91 using the Widget Token as the authkey
     const msg91Res = await axios.post('https://api.msg91.com/api/v5/widget/verifyAccessToken',
       { "access-token": accessToken },
-      { headers: { 'authkey': process.env.MSG91_AUTH_KEY, 'Content-Type': 'application/json' } }
+      { 
+        headers: { 
+          'authkey': process.env.MSG91_WIDGET_TOKEN, 
+          'Content-Type': 'application/json' 
+        } 
+      }
     );
 
     if (msg91Res.data.type !== 'success') {
-      return res.status(401).json({ error: 'Invalid or expired OTP token' });
+      console.error('MSG91 Verification Failed:', msg91Res.data);
+      return res.status(401).json({ 
+        error: 'Invalid or expired OTP token', 
+        details: msg91Res.data 
+      });
     }
 
     // 2. Extract verified mobile number
@@ -802,7 +810,7 @@ app.post('/api/auth/login-mobile-verified', async (req, res) => {
     res.json({ success: true, token, user: customer });
   } catch (err) {
     console.error('MSG91 Verification Error:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Authentication service unavailable' });
+    res.status(500).json({ error: 'Authentication service unavailable', details: err.response?.data || err.message });
   }
 });
 

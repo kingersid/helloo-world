@@ -154,14 +154,16 @@ const Auth = {
         window.verifyOtp(
             otp,
             async (data) => {
-                console.log('OTP Verified by MSG91:', data);
+                console.log('MSG91 Widget Verify Raw Result:', data);
+                const finalToken = data.message || data;
+                console.log('Sending token to backend:', finalToken.slice(0, 30) + '...');
                 // Now notify our backend to create session/issue JWT
                 try {
                     const response = await fetch('/api/auth/login-mobile-verified', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
-                            verifiedData: data.message || data 
+                            verifiedData: finalToken 
                         })
                     });
                     const result = await response.json();
