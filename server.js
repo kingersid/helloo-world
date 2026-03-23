@@ -43,19 +43,6 @@ app.get('/api/config/msg91', (req, res) => {
   });
 });
 
-app.get('/api/auth/test-msg91', async (req, res) => {
-  res.json({
-    widgetId: process.env.MSG91_WIDGET_ID,
-    widgetToken: process.env.MSG91_WIDGET_TOKEN,
-    authKey: process.env.MSG91_AUTH_KEY,
-    envStatus: {
-        hasWidgetId: !!process.env.MSG91_WIDGET_ID,
-        hasWidgetToken: !!process.env.MSG91_WIDGET_TOKEN,
-        hasAuthKey: !!process.env.MSG91_AUTH_KEY
-    }
-  });
-});
-
 // Root route to serve index.html explicitly (required for Vercel/some serverless)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -761,43 +748,55 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 
 app.post('/api/auth/login-mobile-verified', async (req, res) => {
   const { verifiedData } = req.body;
-  const accessToken = verifiedData;
+  if (!verifiedData) return res.status(400).json({ error: 'Access token required' });
 
-  if (!accessToken) return res.status(400).json({ error: 'Access token required' });
+  console.log('Verifying with MSG91...');
+  console.log('AUTH_KEY present:', !!process.env.MSG91_AUTH_KEY);
+  console.log('Token length:', verifiedData?.length);
 
   try {
-    // 1. Verify the token with MSG91 using the Widget Token as the authkey
-    const msg91Res = await axios.post('https://api.msg91.com/api/v5/widget/verifyAccessToken',
-      { "access-token": accessToken },
-      { 
-        headers: { 
-          'authkey': process.env.MSG91_WIDGET_TOKEN, 
-          'Content-Type': 'application/json' 
-        } 
-      }
+    const msg91Res = await axios.post(
+      'https://control.msg91.com/api/v5/widget/verifyAccessToken',
+      {
+        "authkey": process.env.MSG91_AUTH_KEY,
+        "access-token": verifiedData
+      },
+      { headers: { 'Content-Type': 'application/json' } }
     );
 
+    console.log('MSG91 full response:', JSON.stringify(msg91Res.data));
+
     if (msg91Res.data.type !== 'success') {
-      console.error('MSG91 Verification Failed:', msg91Res.data);
       return res.status(401).json({ 
-        error: 'Invalid or expired OTP token', 
-        details: msg91Res.data 
+        error: 'Token verification failed', 
+        detail: msg91Res.data 
       });
     }
 
-    // 2. Extract verified mobile number (safe access with fallback)
-    const verifiedMobile = msg91Res.data.data?.mobile_number || msg91Res.data.mobile_number;
-    
+    // 2. Extract verified mobile number (Extremely robust extraction)
+    const verifiedMobile = 
+      msg91Res.data.data?.mobile_number || 
+      msg91Res.data.data?.full_mobile ||
+      msg91Res.data.mobile_number ||
+      msg91Res.data.full_mobile ||
+      msg91Res.data.message;
+
+    console.log('Extracted verifiedMobile:', verifiedMobile);
+
     if (!verifiedMobile) {
-      console.error('Unexpected MSG91 response shape:', JSON.stringify(msg91Res.data));
-      return res.status(500).json({ error: 'Could not extract verified mobile number' });
+      console.error('No mobile found in response:', JSON.stringify(msg91Res.data));
+      return res.status(500).json({ 
+        error: 'Could not extract mobile from MSG91 response', 
+        raw: msg91Res.data 
+      });
     }
 
-    let cleanMobile = verifiedMobile.replace(/\D/g, '');
+    let cleanMobile = String(verifiedMobile).replace(/\D/g, '');
     if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
 
-    // 3. Get or create customer account
-    let customerResult = await pool.query('SELECT * FROM customer_accounts WHERE mobile = $1', [cleanMobile]);
+    let customerResult = await pool.query(
+      'SELECT * FROM customer_accounts WHERE mobile = $1', [cleanMobile]
+    );
     let customer;
 
     if (customerResult.rows.length === 0) {
@@ -810,7 +809,6 @@ app.post('/api/auth/login-mobile-verified', async (req, res) => {
       customer = customerResult.rows[0];
     }
 
-    // 4. Generate JWT
     const token = jwt.sign(
       { id: customer.id, mobile: customer.mobile, name: customer.name },
       JWT_SECRET,
@@ -818,9 +816,13 @@ app.post('/api/auth/login-mobile-verified', async (req, res) => {
     );
 
     res.json({ success: true, token, user: customer });
+
   } catch (err) {
-    console.error('MSG91 Verification Error:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Authentication service unavailable', details: err.response?.data || err.message });
+    console.error('Full error:', JSON.stringify(err.response?.data || err.message));
+    res.status(500).json({ 
+      error: 'Auth service error', 
+      detail: err.response?.data || err.message 
+    });
   }
 });
 
