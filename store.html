@@ -1506,8 +1506,16 @@
                 </svg>
                 <span class="cart-badge" id="cart-badge">0</span>
             </button>
+            <button class="icon-btn" id="btn-user-auth" aria-label="Account" onclick="handleAuthClick()">
+                <svg viewBox="0 0 24 24" id="user-icon">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                </svg>
+            </button>
         </div>
     </header>
+
+    <script src="auth.js"></script>
 
     <!-- Hero -->
     <section class="hero">
@@ -1906,18 +1914,54 @@
         });
 
         // ── WISHLIST ──
-        function toggleWishlist(e, id) {
+        async function toggleWishlist(e, id) {
             e.stopPropagation();
+            if (!Auth.user) {
+                Auth.showLoginModal();
+                showToast('!', 'Please login to save to wishlist');
+                return;
+            }
+
             const btn = e.currentTarget;
             if (wishlist.has(id)) {
-                wishlist.delete(id);
-                btn.classList.remove('liked');
-                showToast('♡', 'Removed from wishlist');
+                try {
+                    const res = await fetch(`/api/wishlist/${id}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${Auth.token}` }
+                    });
+                    if (res.ok) {
+                        wishlist.delete(id);
+                        btn.classList.remove('liked');
+                        showToast('♡', 'Removed from wishlist');
+                    }
+                } catch (err) { console.error(err); }
             } else {
-                wishlist.add(id);
-                btn.classList.add('liked');
-                const p = PRODUCTS.find(x => x.id === id);
-                showToast('♡', `${p.name} added to wishlist`);
+                try {
+                    const res = await fetch('/api/wishlist', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${Auth.token}`
+                        },
+                        body: JSON.stringify({ productId: id })
+                    });
+                    if (res.ok) {
+                        wishlist.add(id);
+                        btn.classList.add('liked');
+                        const p = PRODUCTS.find(x => x.id === id);
+                        showToast('♡', `${p.name} added to wishlist`);
+                    }
+                } catch (err) { console.error(err); }
+            }
+        }
+
+        function handleAuthClick() {
+            if (Auth.user) {
+                if (confirm(`Logged in as ${Auth.user.mobile}. Logout?`)) {
+                    Auth.logout();
+                }
+            } else {
+                Auth.showLoginModal();
             }
         }
 
@@ -2095,6 +2139,17 @@
             document.getElementById('checkout-form').reset();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+
+        // ── AUTH INTEGRATION ──
+        document.addEventListener('auth:login', (e) => {
+            const user = e.detail;
+            const fMobile = document.getElementById('f-mobile');
+            if (fMobile) fMobile.value = user.mobile || '';
+            const fFirst = document.getElementById('f-first');
+            if (fFirst && user.name) fFirst.value = user.name.split(' ')[0] || '';
+            const fLast = document.getElementById('f-last');
+            if (fLast && user.name) fLast.value = user.name.split(' ').slice(1).join(' ') || '';
+        });
 
         // ── TOAST ──
         function showToast(icon, msg) {

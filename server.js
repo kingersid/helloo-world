@@ -1,10 +1,16 @@
 require('dotenv').config();
 const express = require('express');
+const axios = require('axios');
 const { Pool } = require('pg');
 const path = require('path');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const app = express();
 const port = process.env.PORT || 3000;
+
+const JWT_SECRET = process.env.JWT_SECRET || 'ethnic-vogue-secret-key-2026';
+const MSG91_AUTH_KEY = process.env.MSG91_AUTH_KEY;
+const MSG91_TEMPLATE_ID = process.env.MSG91_TEMPLATE_ID;
 
 // Request logger
 app.use((req, res, next) => {
@@ -29,6 +35,13 @@ const pool = new Pool(poolConfig);
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
+
+app.get('/api/config/msg91', (req, res) => {
+  res.json({
+    widgetId: process.env.MSG91_WIDGET_ID || '366377643768393531303335',
+    tokenAuth: process.env.MSG91_WIDGET_TOKEN || ''
+  });
+});
 
 // Root route to serve index.html explicitly (required for Vercel/some serverless)
 app.get('/', (req, res) => {
@@ -97,6 +110,86 @@ const initDB = async (retries = 5) => {
             size_options TEXT, -- comma separated like 'M,L,XL,UNSTITCHED'
             garment_details TEXT,
             care_instructions TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+
+          -- E-commerce Optimization Tables
+          CREATE TABLE IF NOT EXISTS customer_accounts (
+            id SERIAL PRIMARY KEY,
+            mobile TEXT UNIQUE NOT NULL,
+            name TEXT,
+            email TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE TABLE IF NOT EXISTS otp_sessions (
+            id SERIAL PRIMARY KEY,
+            mobile TEXT NOT NULL,
+            otp_code TEXT NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            used BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX IF NOT EXISTS idx_otp_mobile_exp ON otp_sessions(mobile, expires_at);
+
+          CREATE TABLE IF NOT EXISTS wishlists (
+            customer_id INTEGER REFERENCES customer_accounts(id) ON DELETE CASCADE,
+            product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (customer_id, product_id)
+          );
+
+          CREATE TABLE IF NOT EXISTS product_variants (
+            id SERIAL PRIMARY KEY,
+            product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+            color_name TEXT,
+            color_hex TEXT,
+            size TEXT,
+            stock_quantity INTEGER DEFAULT 0,
+            sku TEXT UNIQUE,
+            image_url TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE TABLE IF NOT EXISTS collections (
+            id SERIAL PRIMARY KEY,
+            slug TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            banner_image_url TEXT,
+            sort_order INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE TABLE IF NOT EXISTS product_collections (
+            product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+            collection_id INTEGER REFERENCES collections(id) ON DELETE CASCADE,
+            sort_order INTEGER DEFAULT 0,
+            PRIMARY KEY (product_id, collection_id)
+          );
+
+          CREATE TABLE IF NOT EXISTS reviews (
+            id SERIAL PRIMARY KEY,
+            product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+            customer_name TEXT NOT NULL,
+            customer_location TEXT,
+            rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+            review_text TEXT,
+            image_url TEXT,
+            is_verified BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE TABLE IF NOT EXISTS ugc_posts (
+            id SERIAL PRIMARY KEY,
+            customer_name TEXT,
+            image_url TEXT NOT NULL,
+            product_id INTEGER REFERENCES products(id),
+            caption TEXT,
+            post_type TEXT CHECK (post_type IN ('celebrity', 'customer')),
+            celebrity_name TEXT,
+            sort_order INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
 
@@ -514,6 +607,242 @@ app.get('/api/orders', async (req, res) => {
       FROM ecommerce_orders o ORDER BY o.created_at DESC
     `);
     res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- AUTH MIDDLEWARE ---
+const authenticateToken = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) return res.status(401).json({ error: 'Authentication required' });
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: 'Invalid or expired token' });
+    req.user = user;
+    next();
+  });
+};
+
+// --- AUTH API ---
+app.post('/api/auth/request-otp', async (req, res) => {
+  const { mobile } = req.body;
+  if (!mobile) return res.status(400).json({ error: 'Mobile number required' });
+
+  // Clean mobile number (remove non-digits, ensure 91 prefix for India)
+  let cleanMobile = mobile.replace(/\D/g, '');
+  if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
+
+  try {
+    if (MSG91_AUTH_KEY && MSG91_TEMPLATE_ID) {
+      // ACTUAL MSG91 CALL
+      const response = await fetch(`https://control.msg91.com/api/v5/otp?template_id=${MSG91_TEMPLATE_ID}&mobile=${cleanMobile}`, {
+        method: 'POST',
+        headers: {
+          'authkey': MSG91_AUTH_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.type === 'error') throw new Error(data.message);
+      
+      console.log(`[MSG91] OTP sent to ${cleanMobile}`);
+      res.json({ success: true, message: 'OTP sent via MSG91' });
+    } else {
+      // FALLBACK TO MOCK FOR DEVELOPMENT
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60000);
+      
+      await pool.query(
+        'INSERT INTO otp_sessions (mobile, otp_code, expires_at) VALUES ($1, $2, $3)',
+        [cleanMobile, otp, expiresAt]
+      );
+      
+      console.log(`[MOCK OTP DEBUG] Mobile: ${cleanMobile}, OTP: ${otp}`);
+      res.json({ success: true, message: 'OTP sent (MOCK)', mock: true });
+    }
+  } catch (err) {
+    console.error('MSG91 Error:', err.message);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
+// --- TEMPORARY DEBUG ROUTE ---
+app.get('/api/auth/debug-otp', async (req, res) => {
+  const { mobile } = req.query;
+  let cleanMobile = (mobile || '').replace(/\D/g, '');
+  if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
+
+  try {
+    const result = await pool.query(
+      'SELECT otp_code FROM otp_sessions WHERE mobile = $1 AND used = FALSE ORDER BY created_at DESC LIMIT 1',
+      [cleanMobile]
+    );
+    if (result.rows.length === 0) return res.json({ error: 'No active OTP found' });
+    res.json({ mobile: cleanMobile, otp: result.rows[0].otp_code });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/verify-otp', async (req, res) => {
+  const { mobile, otp } = req.body;
+  if (!mobile || !otp) return res.status(400).json({ error: 'Mobile and OTP required' });
+
+  let cleanMobile = mobile.replace(/\D/g, '');
+  if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
+
+  try {
+    let isValid = false;
+
+    if (MSG91_AUTH_KEY) {
+      // ACTUAL MSG91 VERIFICATION
+      const response = await fetch(`https://control.msg91.com/api/v5/otp/verify?otp=${otp}&mobile=${cleanMobile}`, {
+        method: 'GET',
+        headers: { 'authkey': MSG91_AUTH_KEY }
+      });
+      const data = await response.json();
+      if (data.type === 'success') isValid = true;
+    } else {
+      // FALLBACK TO MOCK
+      const result = await pool.query(
+        'SELECT * FROM otp_sessions WHERE mobile = $1 AND otp_code = $2 AND expires_at > NOW() AND used = FALSE ORDER BY created_at DESC LIMIT 1',
+        [cleanMobile, otp]
+      );
+      if (result.rows.length > 0) {
+        isValid = true;
+        await pool.query('UPDATE otp_sessions SET used = TRUE WHERE id = $1', [result.rows[0].id]);
+      }
+    }
+
+    if (!isValid) return res.status(400).json({ error: 'Invalid or expired OTP' });
+
+    // Get or create customer account
+    let customerResult = await pool.query('SELECT * FROM customer_accounts WHERE mobile = $1', [cleanMobile]);
+    let customer;
+
+    if (customerResult.rows.length === 0) {
+      const newCustomer = await pool.query(
+        'INSERT INTO customer_accounts (mobile) VALUES ($1) RETURNING *',
+        [cleanMobile]
+      );
+      customer = newCustomer.rows[0];
+    } else {
+      customer = customerResult.rows[0];
+    }
+
+    // Generate JWT
+    const token = jwt.sign(
+      { id: customer.id, mobile: customer.mobile, name: customer.name },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    res.json({ success: true, token, user: customer });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/login-mobile-verified', async (req, res) => {
+  const { verifiedData } = req.body;
+  // verifiedData should be the access-token from MSG91 Widget
+  const accessToken = verifiedData;
+
+  if (!accessToken) return res.status(400).json({ error: 'Access token required' });
+
+  try {
+    // 1. Verify the token with MSG91
+    const msg91Res = await axios.post('https://api.msg91.com/api/v5/widget/verifyAccessToken',
+      { "access-token": accessToken },
+      { headers: { 'authkey': process.env.MSG91_AUTH_KEY, 'Content-Type': 'application/json' } }
+    );
+
+    if (msg91Res.data.type !== 'success') {
+      return res.status(401).json({ error: 'Invalid or expired OTP token' });
+    }
+
+    // 2. Extract verified mobile number
+    const verifiedMobile = msg91Res.data.data.mobile_number;
+    let cleanMobile = verifiedMobile.replace(/\D/g, '');
+    if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
+
+    // 3. Get or create customer account
+    let customerResult = await pool.query('SELECT * FROM customer_accounts WHERE mobile = $1', [cleanMobile]);
+    let customer;
+
+    if (customerResult.rows.length === 0) {
+      const newCustomer = await pool.query(
+        'INSERT INTO customer_accounts (mobile) VALUES ($1) RETURNING *',
+        [cleanMobile]
+      );
+      customer = newCustomer.rows[0];
+    } else {
+      customer = customerResult.rows[0];
+    }
+
+    // 4. Generate JWT
+    const token = jwt.sign(
+      { id: customer.id, mobile: customer.mobile, name: customer.name },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    res.json({ success: true, token, user: customer });
+  } catch (err) {
+    console.error('MSG91 Verification Error:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Authentication service unavailable' });
+  }
+});
+
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, mobile, name, email FROM customer_accounts WHERE id = $1', [req.user.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- WISHLIST API ---
+app.get('/api/wishlist', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT p.* 
+      FROM wishlists w
+      JOIN products p ON w.product_id = p.id
+      WHERE w.customer_id = $1
+    `, [req.user.id]);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/wishlist', authenticateToken, async (req, res) => {
+  const { productId } = req.body;
+  try {
+    await pool.query(
+      'INSERT INTO wishlists (customer_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [req.user.id, productId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/wishlist/:productId', authenticateToken, async (req, res) => {
+  const { productId } = req.params;
+  try {
+    await pool.query(
+      'DELETE FROM wishlists WHERE customer_id = $1 AND product_id = $2',
+      [req.user.id, productId]
+    );
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

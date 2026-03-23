@@ -1814,8 +1814,16 @@
                 </svg>
                 <span class="cart-badge" id="cart-badge">0</span>
             </button>
+            <button class="icon-btn" id="btn-user-auth" aria-label="Account" onclick="handleAuthClick()">
+                <svg viewBox="0 0 24 24" id="user-icon">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                </svg>
+            </button>
         </div>
     </header>
+
+    <script src="auth.js"></script>
 
     <!-- Breadcrumb -->
     <nav class="breadcrumb">
@@ -2534,15 +2542,50 @@
         }
 
         // ─── WISHLIST ───
-        function toggleWishlist() {
+        async function toggleWishlist() {
+            if (!Auth.user) {
+                Auth.showLoginModal();
+                showToast('!', 'Please login to save to wishlist');
+                return;
+            }
+
             wishlisted = !wishlisted;
             const btn = document.getElementById('btn-wish');
             const mobileBtn = document.getElementById('mobile-wish-btn');
-            btn.classList.toggle('liked', wishlisted);
-            mobileBtn.classList.toggle('liked', wishlisted);
-            btn.innerHTML = `<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:${wishlisted ? 'currentColor' : 'none'};stroke-width:2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-    ${wishlisted ? 'Saved to Wishlist' : 'Save to Wishlist'}`;
-            showToast(wishlisted ? '♡' : '', wishlisted ? `${currentProduct.name} saved` : `Removed from wishlist`);
+            
+            try {
+                const res = await fetch(wishlisted ? '/api/wishlist' : `/api/wishlist/${currentProduct.id}`, {
+                    method: wishlisted ? 'POST' : 'DELETE',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${Auth.token}`
+                    },
+                    body: wishlisted ? JSON.stringify({ productId: currentProduct.id }) : null
+                });
+
+                if (res.ok) {
+                    btn.classList.toggle('liked', wishlisted);
+                    mobileBtn.classList.toggle('liked', wishlisted);
+                    btn.innerHTML = `<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:${wishlisted ? 'currentColor' : 'none'};stroke-width:2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            ${wishlisted ? 'Saved to Wishlist' : 'Save to Wishlist'}`;
+                    showToast(wishlisted ? '♡' : '', wishlisted ? `${currentProduct.name} saved` : `Removed from wishlist`);
+                } else {
+                    wishlisted = !wishlisted; // Revert on failure
+                }
+            } catch (err) {
+                console.error(err);
+                wishlisted = !wishlisted; // Revert on failure
+            }
+        }
+
+        function handleAuthClick() {
+            if (Auth.user) {
+                if (confirm(`Logged in as ${Auth.user.mobile}. Logout?`)) {
+                    Auth.logout();
+                }
+            } else {
+                Auth.showLoginModal();
+            }
         }
 
         // ─── CART OPEN/CLOSE ───
