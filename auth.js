@@ -22,9 +22,6 @@ const Auth = {
         console.error('Failed to fetch MSG91 config', err);
     }
 
-    // Initialize MSG91 Widget
-    this.initMSG91();
-
     if (this.token) {
       try {
         const response = await fetch('/api/auth/me', {
@@ -76,10 +73,8 @@ const Auth = {
     const modal = document.getElementById('auth-modal-container');
     if (modal) modal.style.display = 'flex';
     
-    // If widget didn't load or was reset
-    if (!this._widgetInitialized && window.initSendOTP) {
-        this._setupWidget();
-    }
+    // Initialize widget only when modal is shown
+    this.initMSG91();
   },
 
   hideLoginModal() {
