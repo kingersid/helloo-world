@@ -45,10 +45,14 @@ app.get('/api/config/msg91', (req, res) => {
 
 app.get('/api/auth/test-msg91', async (req, res) => {
   res.json({
-    authKeyPresent: !!process.env.MSG91_AUTH_KEY,
-    authKeyLength: process.env.MSG91_AUTH_KEY?.length,
-    widgetTokenPresent: !!process.env.MSG91_WIDGET_TOKEN,
-    widgetId: process.env.MSG91_WIDGET_ID
+    widgetId: process.env.MSG91_WIDGET_ID,
+    widgetToken: process.env.MSG91_WIDGET_TOKEN,
+    authKey: process.env.MSG91_AUTH_KEY,
+    envStatus: {
+        hasWidgetId: !!process.env.MSG91_WIDGET_ID,
+        hasWidgetToken: !!process.env.MSG91_WIDGET_TOKEN,
+        hasAuthKey: !!process.env.MSG91_AUTH_KEY
+    }
   });
 });
 
@@ -781,8 +785,14 @@ app.post('/api/auth/login-mobile-verified', async (req, res) => {
       });
     }
 
-    // 2. Extract verified mobile number
-    const verifiedMobile = msg91Res.data.data.mobile_number;
+    // 2. Extract verified mobile number (safe access with fallback)
+    const verifiedMobile = msg91Res.data.data?.mobile_number || msg91Res.data.mobile_number;
+    
+    if (!verifiedMobile) {
+      console.error('Unexpected MSG91 response shape:', JSON.stringify(msg91Res.data));
+      return res.status(500).json({ error: 'Could not extract verified mobile number' });
+    }
+
     let cleanMobile = verifiedMobile.replace(/\D/g, '');
     if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
 

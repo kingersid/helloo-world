@@ -2,6 +2,7 @@
 const Auth = {
   token: localStorage.getItem('ev_token'),
   user: null,
+  _widgetInitialized: false,
   msg91Config: {
     widgetId: "366377643768393531303335", // Replace with actual widgetId from MSG91 dashboard
     tokenAuth: "", // Replace with actual widget token from MSG91 dashboard
@@ -45,6 +46,14 @@ const Auth = {
   _injectModal() {
     if (document.getElementById('auth-modal-container')) return;
     
+    // Captcha anchor lives OUTSIDE the modal, permanently in DOM to prevent re-mounting
+    if (!document.getElementById('msg91-captcha')) {
+        const captchaDiv = document.createElement('div');
+        captchaDiv.id = 'msg91-captcha';
+        captchaDiv.style.display = 'none';
+        document.body.appendChild(captchaDiv);
+    }
+
     const modalHtml = `
       <div id="auth-modal-container" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(5px); z-index:9999; align-items:center; justify-content:center;">
         <div style="background:white; padding:40px; border-radius:8px; max-width:400px; width:90%; position:relative; box-shadow:0 20px 60px rgba(0,0,0,0.2);">
@@ -57,7 +66,6 @@ const Auth = {
               <label style="display:block; font-family:'DM Mono', monospace; font-size:10px; text-transform:uppercase; margin-bottom:8px;">Mobile Number</label>
               <input type="tel" id="login-mobile" placeholder="+91 98765 43210" style="width:100%; padding:14px; border:1px solid #D9C9B8; border-radius:4px; font-family:inherit;">
             </div>
-            <div id="msg91-captcha" style="margin-bottom:20px; min-height: 50px;"></div>
             <button id="btn-send-otp" onclick="handleSendOTP()" style="width:100%; background:#2C2A28; color:white; padding:16px; border:none; border-radius:4px; font-family:'DM Mono', monospace; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer;">Get OTP</button>
           </div>
 
@@ -96,17 +104,42 @@ const Auth = {
         console.warn('MSG91 Widget: tokenAuth is missing. Widget will not initialize. Please set MSG91_WIDGET_TOKEN in .env');
         return;
     }
+    if (this._widgetInitialized) {
+        console.log('MSG91 Widget already initialized, skipping.');
+        return;
+    }
     if (window.initSendOTP) {
         this._setupWidget();
         return;
     }
-    const script = document.createElement('script');
-    script.src = "https://verify.msg91.com/otp-provider.js";
-    script.onload = () => this._setupWidget();
-    document.head.appendChild(script);
+
+    // Use MSG91's recommended fallback loader
+    const urls = [
+        'https://verify.msg91.com/otp-provider.js',
+        'https://verify.phone91.com/otp-provider.js'
+    ];
+    let i = 0;
+    const attempt = () => {
+        const s = document.createElement('script');
+        s.src = urls[i];
+        s.async = true;
+        s.onload = () => {
+            if (typeof window.initSendOTP === 'function') {
+                this._setupWidget();
+            }
+        };
+        s.onerror = () => {
+            i++;
+            if (i < urls.length) attempt();
+            else console.error('MSG91 script failed to load from all URLs');
+        };
+        document.head.appendChild(s);
+    };
+    attempt();
   },
 
   _setupWidget() {
+    if (this._widgetInitialized) return;
     if (!this.msg91Config.tokenAuth) return;
     const configuration = {
       widgetId: this.msg91Config.widgetId,
@@ -122,8 +155,11 @@ const Auth = {
           console.log('MSG91 Widget Global Failure:', error);
       }
     };
+    console.log('MSG91 Init Config:', { widgetId: configuration.widgetId, tokenAuth: configuration.tokenAuth });
     try {
         window.initSendOTP(configuration);
+        this._widgetInitialized = true;
+        console.log('MSG91 Widget initialized successfully.');
     } catch (e) {
         console.error('MSG91 initSendOTP failed:', e);
     }
