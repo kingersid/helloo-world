@@ -5,12 +5,20 @@ const { Pool } = require('pg');
 const path = require('path');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const Razorpay = require('razorpay');
 const app = express();
 const port = process.env.PORT || 3000;
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ethnic-vogue-secret-key-2026';
 const MSG91_AUTH_KEY = process.env.MSG91_AUTH_KEY;
 const MSG91_TEMPLATE_ID = process.env.MSG91_TEMPLATE_ID;
+const MSG91_ORDER_TEMPLATE_ID = process.env.MSG91_ORDER_TEMPLATE_ID;
+
+// Razorpay Initialization
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || 'placeholder_secret',
+});
 
 // Request logger
 app.use((req, res, next) => {
@@ -27,7 +35,7 @@ const poolConfig = {
   connectionString: dbUrl,
 };
 
-if (dbUrl && (dbUrl.includes('proxy.rlwy.net') || dbUrl.includes('koyeb.app') || process.env.NODE_ENV === 'production')) {
+if (dbUrl && (dbUrl.includes('proxy.rlwy.net') || dbUrl.includes('koyeb.app') || dbUrl.includes('supabase.co') || process.env.NODE_ENV === 'production')) {
   poolConfig.ssl = { rejectUnauthorized: false };
 }
 
@@ -217,8 +225,29 @@ const initDB = async (retries = 5) => {
             address TEXT,
             total_amount DECIMAL(10, 2),
             status TEXT DEFAULT 'Pending',
+            razorpay_order_id TEXT,
+            razorpay_payment_id TEXT,
+            razorpay_signature TEXT,
+            payment_method TEXT DEFAULT 'cod',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
+
+          -- Migration: Add new columns if they don't exist
+          DO $$ 
+          BEGIN 
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ecommerce_orders' AND column_name='razorpay_order_id') THEN
+              ALTER TABLE ecommerce_orders ADD COLUMN razorpay_order_id TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ecommerce_orders' AND column_name='razorpay_payment_id') THEN
+              ALTER TABLE ecommerce_orders ADD COLUMN razorpay_payment_id TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ecommerce_orders' AND column_name='razorpay_signature') THEN
+              ALTER TABLE ecommerce_orders ADD COLUMN razorpay_signature TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ecommerce_orders' AND column_name='payment_method') THEN
+              ALTER TABLE ecommerce_orders ADD COLUMN payment_method TEXT DEFAULT 'cod';
+            END IF;
+          END $$;
 
           CREATE TABLE IF NOT EXISTS order_items (
             id SERIAL PRIMARY KEY,
@@ -588,6 +617,25 @@ app.post('/api/orders', async (req, res) => {
       // Update stock
       await client.query('UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2', [item.quantity, item.product_id]);
     }
+
+    // Send SMS via MSG91 for COD
+    if (MSG91_AUTH_KEY && MSG91_ORDER_TEMPLATE_ID) {
+      let cleanMobile = customer_mobile.replace(/\D/g, '');
+      if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
+      
+      const payload = {
+        template_id: MSG91_ORDER_TEMPLATE_ID,
+        mobile: cleanMobile,
+        name: customer_name,
+        order_id: orderId.toString(),
+        amount: total_amount.toString()
+      };
+      
+      axios.post('https://control.msg91.com/api/v5/flow/', payload, {
+        headers: { 'authkey': MSG91_AUTH_KEY, 'Content-Type': 'application/json' }
+      }).catch(err => console.error('MSG91 SMS Error (COD):', err.message));
+    }
+
     await client.query('COMMIT');
     res.json({ success: true, orderId });
   } catch (err) {
@@ -596,6 +644,116 @@ app.post('/api/orders', async (req, res) => {
   } finally {
     client.release();
   }
+});
+
+// --- RAZORPAY API ---
+app.post('/api/payment/create-order', async (req, res) => {
+  const { amount, currency = 'INR' } = req.body;
+  try {
+    const options = {
+      amount: Math.round(amount * 100), // convert to paise
+      currency,
+      receipt: `receipt_${Date.now()}`,
+    };
+    const order = await razorpay.orders.create(options);
+    res.json({
+      success: true,
+      razorpay_order_id: order.id,
+      amount: order.amount,
+      key_id: process.env.RAZORPAY_KEY_ID
+    });
+  } catch (err) {
+    console.error('Razorpay Create Order Error:', err);
+    res.status(500).json({ error: 'Failed to create payment order' });
+  }
+});
+
+app.post('/api/payment/verify', async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData } = req.body;
+  const hmac = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
+  hmac.update(razorpay_order_id + "|" + razorpay_payment_id);
+  const generated_signature = hmac.digest('hex');
+
+  if (generated_signature !== razorpay_signature) {
+    return res.status(400).json({ error: 'Invalid payment signature' });
+  }
+
+  // Create order in DB after successful verification
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { customer_name, customer_mobile, address, items, total_amount } = orderData;
+    const orderResult = await client.query(`
+      INSERT INTO ecommerce_orders (
+        customer_name, customer_mobile, address, total_amount, status,
+        razorpay_order_id, razorpay_payment_id, razorpay_signature, payment_method
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
+    `, [customer_name, customer_mobile, address, total_amount, 'Paid', razorpay_order_id, razorpay_payment_id, razorpay_signature, 'Online']);
+    
+    const orderId = orderResult.rows[0].id;
+
+    for (const item of items) {
+      await client.query(
+        'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4)',
+        [orderId, item.product_id, item.quantity, item.price]
+      );
+      await client.query('UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2', [item.quantity, item.product_id]);
+    }
+
+    // Send SMS via MSG91
+    if (MSG91_AUTH_KEY && MSG91_ORDER_TEMPLATE_ID) {
+      let cleanMobile = customer_mobile.replace(/\D/g, '');
+      if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
+      
+      const payload = {
+        template_id: MSG91_ORDER_TEMPLATE_ID,
+        mobile: cleanMobile,
+        name: customer_name,
+        order_id: orderId.toString(),
+        amount: total_amount.toString()
+      };
+      
+      axios.post('https://control.msg91.com/api/v5/flow/', payload, {
+        headers: { 'authkey': MSG91_AUTH_KEY, 'Content-Type': 'application/json' }
+      }).catch(err => console.error('MSG91 SMS Error:', err.message));
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, orderId });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.post('/api/payment/webhook', async (req, res) => {
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  const signature = req.headers['x-razorpay-signature'];
+
+  if (!secret || !signature) return res.status(400).send('Missing secret/signature');
+
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(req.body))
+    .digest('hex');
+
+  if (signature !== expectedSignature) return res.status(400).send('Invalid webhook signature');
+
+  const event = req.body.event;
+  const payment = req.body.payload.payment.entity;
+
+  if (event === 'payment.captured') {
+    // Check if order already exists in DB (it should from /verify)
+    // If not, handle async creation (edge case)
+    console.log(`Payment captured: ${payment.id} for order ${payment.order_id}`);
+  } else if (event === 'payment.failed') {
+    console.log(`Payment failed: ${payment.id} for order ${payment.order_id}`);
+    // Update order status if it was already created but pending
+  }
+
+  res.json({ status: 'ok' });
 });
 
 app.get('/api/orders', async (req, res) => {

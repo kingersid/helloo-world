@@ -8,6 +8,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Dancing+Script:wght@400;600&display=swap"
         rel="stylesheet">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
         :root {
             --cream: #FAF7F2;
@@ -1695,10 +1696,10 @@
                         </div>
                     </label>
                     <label class="payment-option" onclick="selectPayment(this)">
-                        <input type="radio" name="payment" value="upi">
+                        <input type="radio" name="payment" value="online">
                         <div>
-                            <div class="payment-option-label">UPI / GPay / PhonePe</div>
-                            <div class="payment-option-sub">Instant payment via UPI</div>
+                            <div class="payment-option-label">UPI / Card / NetBanking</div>
+                            <div class="payment-option-sub">Secure online payment via Razorpay</div>
                         </div>
                     </label>
 
@@ -2085,6 +2086,8 @@
         function selectPayment(el) {
             document.querySelectorAll('.payment-option').forEach(x => x.classList.remove('selected'));
             el.classList.add('selected');
+            const radio = el.querySelector('input[type=radio]');
+            if (radio) radio.checked = true;
         }
 
         document.getElementById('checkout-form').onsubmit = async e => {
@@ -2096,6 +2099,7 @@
             const city = document.getElementById('f-city').value.trim();
             const pin = document.getElementById('f-pin').value.trim();
             const state = document.getElementById('f-state').value;
+            const paymentMethod = document.querySelector('input[name="payment"]:checked').value;
             
             if (!first || !mobile || !address || !city || !pin) {
                 showToast('!', 'Please fill all required fields'); return;
@@ -2110,29 +2114,91 @@
                 total_amount: total
             };
 
-            try {
-                const res = await fetch('/api/orders', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(orderData)
-                });
+            if (paymentMethod === 'cod') {
+                try {
+                    const res = await fetch('/api/orders', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(orderData)
+                    });
 
-                if (res.ok) {
-                    const data = await res.json();
-                    document.getElementById('success-order-id').textContent = `Order #EV-${data.orderId.toString().padStart(6, '0')}`;
-                    document.getElementById('checkout-container').style.display = 'none';
-                    document.getElementById('success-screen').style.display = 'flex';
-                    cart = [];
-                    saveCart();
-                    updateCartUI();
-                    fetchProducts(); // Refresh stock and categories
-                } else {
-                    showToast('!', 'Failed to place order');
+                    if (res.ok) {
+                        const data = await res.json();
+                        handleOrderSuccess(data.orderId);
+                    } else {
+                        showToast('!', 'Failed to place order');
+                    }
+                } catch (err) {
+                    showToast('!', 'Connection error');
                 }
-            } catch (err) {
-                showToast('!', 'Connection error');
+            } else {
+                // Online Payment via Razorpay
+                try {
+                    const res = await fetch('/api/payment/create-order', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ amount: total })
+                    });
+                    const order = await res.json();
+                    
+                    if (!order.success) throw new Error('Order creation failed');
+
+                    const options = {
+                        key: order.key_id,
+                        amount: order.amount,
+                        currency: "INR",
+                        name: "Ethnic Vogue",
+                        description: "Handcrafted Luxury",
+                        order_id: order.razorpay_order_id,
+                        handler: async function (response) {
+                            // Verify payment on backend
+                            const verifyRes = await fetch('/api/payment/verify', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    razorpay_order_id: response.razorpay_order_id,
+                                    razorpay_payment_id: response.razorpay_payment_id,
+                                    razorpay_signature: response.razorpay_signature,
+                                    orderData: orderData
+                                })
+                            });
+                            const verifyData = await verifyRes.json();
+                            if (verifyData.success) {
+                                handleOrderSuccess(verifyData.orderId);
+                            } else {
+                                showToast('!', 'Payment verification failed');
+                            }
+                        },
+                        prefill: {
+                            name: `${first} ${last}`,
+                            email: document.getElementById('f-email').value,
+                            contact: mobile
+                        },
+                        theme: {
+                            color: "#C9A96E"
+                        }
+                    };
+                    const rzp = new Razorpay(options);
+                    rzp.on('payment.failed', function (response){
+                        showToast('!', 'Payment failed: ' + response.error.description);
+                    });
+                    rzp.open();
+                } catch (err) {
+                    console.error(err);
+                    showToast('!', 'Payment initialization failed');
+                }
             }
         };
+
+        function handleOrderSuccess(orderId) {
+            document.getElementById('success-order-id').textContent = `Order #EV-${orderId.toString().padStart(6, '0')}`;
+            document.getElementById('checkout-container').style.display = 'none';
+            document.getElementById('success-screen').style.display = 'flex';
+            cart = [];
+            saveCart();
+            updateCartUI();
+            fetchProducts(); // Refresh stock and categories
+        }
 
         function resetAfterOrder() {
             document.getElementById('success-screen').style.display = 'none';
