@@ -400,6 +400,111 @@
             color: white;
         }
 
+        /* Custom Dropdown for customer search */
+        .autocomplete-container {
+            position: relative;
+        }
+
+        .autocomplete-items {
+            position: absolute;
+            border: 1px solid var(--border);
+            border-bottom: none;
+            border-top: none;
+            z-index: 99;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .autocomplete-items div {
+            padding: 12px;
+            cursor: pointer;
+            background-color: #fff;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        .autocomplete-items div:hover {
+            background-color: #f1f1f1;
+        }
+
+        .autocomplete-active {
+            background-color: var(--accent) !important;
+            color: #ffffff;
+        }
+
+        /* Toggle Switch */
+        .switch-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 1rem;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            -webkit-transition: .4s;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            -webkit-transition: .4s;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--success);
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px var(--success);
+        }
+
+        input:checked + .slider:before {
+            -webkit-transform: translateX(24px);
+            -ms-transform: translateX(24px);
+            transform: translateX(24px);
+        }
+
+        .switch-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-light);
+        }
+
         .btn-close-modal {
             background-color: transparent;
             color: #777;
@@ -583,6 +688,7 @@
         <div id="billForm">
             <h3 class="form-section-title" id="formTitle">New Invoice Details</h3>
             <input type="hidden" id="editTransactionId">
+            <input type="hidden" id="selectedCustomerId">
 
             <div class="form-row">
                 <div class="form-group">
@@ -595,10 +701,19 @@
                 </div>
             </div>
 
+            <div class="switch-container">
+                <label class="switch">
+                    <input type="checkbox" id="existingCustToggle">
+                    <span class="slider"></span>
+                </label>
+                <span class="switch-label">Already Existing Customer?</span>
+            </div>
+
             <div class="form-row">
-                <div class="form-group">
+                <div class="form-group autocomplete-container">
                     <label>Client Name</label>
                     <input type="text" id="custName" placeholder="Full name">
+                    <div id="custSuggestions" class="autocomplete-items" style="display: none;"></div>
                 </div>
                 <div class="form-group">
                     <label>Mobile Contact</label>
@@ -804,6 +919,61 @@
         const addItemBtn = document.getElementById('addItemBtn');
         const grandTotalDisplay = document.getElementById('grandTotalDisplay');
 
+        // Customer Autocomplete Logic
+        const custNameInput = document.getElementById('custName');
+        const custMobileInput = document.getElementById('custMobile');
+        const custSuggestions = document.getElementById('custSuggestions');
+        const existingCustToggle = document.getElementById('existingCustToggle');
+
+        let debounceTimer;
+        custNameInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            document.getElementById('selectedCustomerId').value = '';
+            const query = custNameInput.value.trim();
+            if (query.length < 2) {
+                custSuggestions.style.display = 'none';
+                return;
+            }
+
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/api/customers/search?name=${encodeURIComponent(query)}`);
+                    const customers = await response.json();
+                    
+                    if (customers.length > 0) {
+                        custSuggestions.innerHTML = customers.map(c => `
+                            <div class="suggestion-item" data-id="${c.id}" data-name="${c.name}" data-mobile="${c.mobile}">
+                                <strong>${c.name}</strong> <span style="font-size: 0.8rem; color: #777;">(${c.mobile})</span>
+                            </div>
+                        `).join('');
+                        custSuggestions.style.display = 'block';
+                    } else {
+                        custSuggestions.style.display = 'none';
+                    }
+                } catch (err) {
+                    console.error('Error fetching suggestions:', err);
+                }
+            }, 300);
+        });
+
+        custSuggestions.addEventListener('click', (e) => {
+            const item = e.target.closest('.suggestion-item');
+            if (item) {
+                custNameInput.value = item.dataset.name;
+                custMobileInput.value = item.dataset.mobile;
+                document.getElementById('selectedCustomerId').value = item.dataset.id;
+                existingCustToggle.checked = true;
+                custSuggestions.style.display = 'none';
+            }
+        });
+
+        // Close suggestions when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!custSuggestions.contains(e.target) && e.target !== custNameInput) {
+                custSuggestions.style.display = 'none';
+            }
+        });
+
         // Navigation Switcher
         function showView(view) {
             // Hide all views first
@@ -846,6 +1016,8 @@
             document.getElementById('custName').value = '';
             document.getElementById('custMobile').value = '';
             document.getElementById('billNo').value = '';
+            document.getElementById('selectedCustomerId').value = '';
+            document.getElementById('existingCustToggle').checked = false;
             itemsBody.innerHTML = `
                 <tr>
                     <td><input type="text" class="article-input" placeholder="e.g. Handmade Silk Scarf" style="min-width: 200px;"></td>
@@ -971,6 +1143,7 @@
 
                 document.getElementById('custName').value = bill.customerName || 'Walk-in';
                 document.getElementById('custMobile').value = bill.customerMobile || '';
+                document.getElementById('existingCustToggle').checked = (bill.customerName && bill.customerName !== 'Walk-in');
                 document.getElementById('billNo').value = bill.billNo || '';
 
                 if (bill.billDate) {
@@ -1430,6 +1603,7 @@
             const billDate = document.getElementById('billDate').value;
             const billNo = document.getElementById('billNo').value;
             const transactionId = document.getElementById('editTransactionId').value;
+            const customerId = document.getElementById('selectedCustomerId').value;
             const rows = itemsBody.querySelectorAll('tr');
             const items = [];
 
@@ -1468,7 +1642,8 @@
                         billNo,
                         items,
                         grandTotal: parseFloat(grandTotalDisplay.innerText.replace('₹', '')),
-                        transactionId: transactionId || null
+                        transactionId: transactionId || null,
+                        customerId: customerId || null
                     })
                 });
 

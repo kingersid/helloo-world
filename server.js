@@ -16,8 +16,8 @@ const MSG91_ORDER_TEMPLATE_ID = process.env.MSG91_ORDER_TEMPLATE_ID;
 
 // Razorpay Initialization
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'placeholder_secret',
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
 // Request logger
@@ -130,15 +130,15 @@ const initDB = async (retries = 5) => {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
 
-          CREATE TABLE IF NOT EXISTS otp_sessions (
+          CREATE TABLE IF NOT EXISTS otp_codes (
             id SERIAL PRIMARY KEY,
-            mobile TEXT NOT NULL,
-            otp_code TEXT NOT NULL,
+            phone_number TEXT NOT NULL,
+            code TEXT NOT NULL,
             expires_at TIMESTAMP NOT NULL,
             used BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
-          CREATE INDEX IF NOT EXISTS idx_otp_mobile_exp ON otp_sessions(mobile, expires_at);
+          CREATE INDEX IF NOT EXISTS idx_otp_mobile_exp ON otp_codes(phone_number, expires_at);
 
           CREATE TABLE IF NOT EXISTS wishlists (
             customer_id INTEGER REFERENCES customer_accounts(id) ON DELETE CASCADE,
@@ -222,6 +222,7 @@ const initDB = async (retries = 5) => {
             id SERIAL PRIMARY KEY,
             customer_name TEXT,
             customer_mobile TEXT,
+            customer_id INTEGER REFERENCES customers(id),
             address TEXT,
             total_amount DECIMAL(10, 2),
             status TEXT DEFAULT 'Pending',
@@ -312,26 +313,28 @@ const initDB = async (retries = 5) => {
 initDB();
 
 app.post('/api/bills', async (req, res) => {
-  const { name, mobile, billDate, billNo, items, grandTotal, transactionId } = req.body;
+  const { name, mobile, billDate, billNo, items, grandTotal, transactionId, customerId: providedCustomerId } = req.body;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     // 1. Get or Create Customer
-    let customerResult = await client.query(
-      'SELECT id FROM customers WHERE name = $1 AND mobile = $2',
-      [name, mobile]
-    );
-
-    let customerId;
-    if (customerResult.rows.length === 0) {
-      const newCustomer = await client.query(
-        'INSERT INTO customers (name, mobile) VALUES ($1, $2) RETURNING id',
+    let customerId = providedCustomerId;
+    if (!customerId) {
+      let customerResult = await client.query(
+        'SELECT id FROM customers WHERE name = $1 AND mobile = $2',
         [name, mobile]
       );
-      customerId = newCustomer.rows[0].id;
-    } else {
-      customerId = customerResult.rows[0].id;
+
+      if (customerResult.rows.length === 0) {
+        const newCustomer = await client.query(
+          'INSERT INTO customers (name, mobile) VALUES ($1, $2) RETURNING id',
+          [name, mobile]
+        );
+        customerId = newCustomer.rows[0].id;
+      } else {
+        customerId = customerResult.rows[0].id;
+      }
     }
 
     // 2. Determine Bill Number
@@ -364,6 +367,25 @@ app.post('/api/bills', async (req, res) => {
     res.status(500).json({ error: 'Failed to save bill' });
   } finally {
     client.release();
+  }
+});
+
+app.get('/api/customers/search', async (req, res) => {
+  const { name } = req.query;
+  if (!name) return res.json([]);
+  try {
+    // Prioritize results that start with the query, then those that contain it
+    const result = await pool.query(
+      `SELECT id, name, mobile FROM customers 
+       WHERE name ILIKE $1 
+       ORDER BY (CASE WHEN name ILIKE $2 THEN 0 ELSE 1 END), name ASC 
+       LIMIT 10`,
+      [`%${name}%`, `${name}%`]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error searching customers:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -603,9 +625,27 @@ app.post('/api/orders', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Link to customers table
+    let customerId;
+    let customerResult = await client.query(
+      'SELECT id FROM customers WHERE name = $1 AND mobile = $2',
+      [customer_name, customer_mobile]
+    );
+
+    if (customerResult.rows.length === 0) {
+      const newCustomer = await client.query(
+        'INSERT INTO customers (name, mobile) VALUES ($1, $2) RETURNING id',
+        [customer_name, customer_mobile]
+      );
+      customerId = newCustomer.rows[0].id;
+    } else {
+      customerId = customerResult.rows[0].id;
+    }
+
     const orderResult = await client.query(
-      'INSERT INTO ecommerce_orders (customer_name, customer_mobile, address, total_amount) VALUES ($1, $2, $3, $4) RETURNING id',
-      [customer_name, customer_mobile, address, total_amount]
+      'INSERT INTO ecommerce_orders (customer_name, customer_mobile, address, total_amount, customer_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [customer_name, customer_mobile, address, total_amount, customerId]
     );
     const orderId = orderResult.rows[0].id;
 
@@ -649,6 +689,13 @@ app.post('/api/orders', async (req, res) => {
 // --- RAZORPAY API ---
 app.post('/api/payment/create-order', async (req, res) => {
   const { amount, currency = 'INR' } = req.body;
+  console.log(`Creating Razorpay order for amount: ${amount} ${currency}`);
+  
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    console.error('Razorpay keys are missing in environment variables!');
+    return res.status(500).json({ error: 'Razorpay configuration missing on server' });
+  }
+
   try {
     const options = {
       amount: Math.round(amount * 100), // convert to paise
@@ -656,6 +703,7 @@ app.post('/api/payment/create-order', async (req, res) => {
       receipt: `receipt_${Date.now()}`,
     };
     const order = await razorpay.orders.create(options);
+    console.log('Razorpay Order created successfully:', order.id);
     res.json({
       success: true,
       razorpay_order_id: order.id,
@@ -664,7 +712,7 @@ app.post('/api/payment/create-order', async (req, res) => {
     });
   } catch (err) {
     console.error('Razorpay Create Order Error:', err);
-    res.status(500).json({ error: 'Failed to create payment order' });
+    res.status(500).json({ error: err.message || 'Failed to create payment order' });
   }
 });
 
@@ -683,12 +731,30 @@ app.post('/api/payment/verify', async (req, res) => {
   try {
     await client.query('BEGIN');
     const { customer_name, customer_mobile, address, items, total_amount } = orderData;
+
+    // Link to customers table
+    let customerId;
+    let customerResult = await client.query(
+      'SELECT id FROM customers WHERE name = $1 AND mobile = $2',
+      [customer_name, customer_mobile]
+    );
+
+    if (customerResult.rows.length === 0) {
+      const newCustomer = await client.query(
+        'INSERT INTO customers (name, mobile) VALUES ($1, $2) RETURNING id',
+        [customer_name, customer_mobile]
+      );
+      customerId = newCustomer.rows[0].id;
+    } else {
+      customerId = customerResult.rows[0].id;
+    }
+
     const orderResult = await client.query(`
       INSERT INTO ecommerce_orders (
         customer_name, customer_mobile, address, total_amount, status,
-        razorpay_order_id, razorpay_payment_id, razorpay_signature, payment_method
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
-    `, [customer_name, customer_mobile, address, total_amount, 'Paid', razorpay_order_id, razorpay_payment_id, razorpay_signature, 'Online']);
+        razorpay_order_id, razorpay_payment_id, razorpay_signature, payment_method, customer_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id
+    `, [customer_name, customer_mobile, address, total_amount, 'Paid', razorpay_order_id, razorpay_payment_id, razorpay_signature, 'Online', customerId]);
     
     const orderId = orderResult.rows[0].id;
 
@@ -784,123 +850,105 @@ const authenticateToken = async (req, res, next) => {
   });
 };
 
+const normalizeMobile = (mobile) => {
+  let cleanMobile = String(mobile || '').replace(/\D/g, '');
+  if (cleanMobile.length === 10) cleanMobile = `91${cleanMobile}`;
+  return cleanMobile;
+};
+
 // --- AUTH API ---
 app.post('/api/auth/request-otp', async (req, res) => {
   const { mobile } = req.body;
   if (!mobile) return res.status(400).json({ error: 'Mobile number required' });
 
-  // Clean mobile number (remove non-digits, ensure 91 prefix for India)
-  let cleanMobile = mobile.replace(/\D/g, '');
-  if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
-
-  try {
-    if (MSG91_AUTH_KEY && MSG91_TEMPLATE_ID) {
-      // ACTUAL MSG91 CALL
-      const response = await fetch(`https://control.msg91.com/api/v5/otp?template_id=${MSG91_TEMPLATE_ID}&mobile=${cleanMobile}`, {
-        method: 'POST',
-        headers: {
-          'authkey': MSG91_AUTH_KEY,
-          'Content-Type': 'application/json'
-        }
-      });
-      const data = await response.json();
-      if (data.type === 'error') throw new Error(data.message);
-      
-      console.log(`[MSG91] OTP sent to ${cleanMobile}`);
-      res.json({ success: true, message: 'OTP sent via MSG91' });
-    } else {
-      // FALLBACK TO MOCK FOR DEVELOPMENT
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + 10 * 60000);
-      
-      await pool.query(
-        'INSERT INTO otp_sessions (mobile, otp_code, expires_at) VALUES ($1, $2, $3)',
-        [cleanMobile, otp, expiresAt]
-      );
-      
-      console.log(`[MOCK OTP DEBUG] Mobile: ${cleanMobile}, OTP: ${otp}`);
-      res.json({ success: true, message: 'OTP sent (MOCK)', mock: true });
-    }
-  } catch (err) {
-    console.error('MSG91 Error:', err.message);
-    res.status(500).json({ error: 'Failed to send OTP' });
-  }
-});
-
-// --- TEMPORARY DEBUG ROUTE ---
-app.get('/api/auth/debug-otp', async (req, res) => {
-  const { mobile } = req.query;
-  let cleanMobile = (mobile || '').replace(/\D/g, '');
-  if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
-
-  try {
-    const result = await pool.query(
-      'SELECT otp_code FROM otp_sessions WHERE mobile = $1 AND used = FALSE ORDER BY created_at DESC LIMIT 1',
-      [cleanMobile]
-    );
-    if (result.rows.length === 0) return res.json({ error: 'No active OTP found' });
-    res.json({ mobile: cleanMobile, otp: result.rows[0].otp_code });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/auth/verify-otp', async (req, res) => {
-  const { mobile, otp } = req.body;
-  if (!mobile || !otp) return res.status(400).json({ error: 'Mobile and OTP required' });
-
-  let cleanMobile = mobile.replace(/\D/g, '');
-  if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
-
-  try {
-    let isValid = false;
-
-    if (MSG91_AUTH_KEY) {
-      // ACTUAL MSG91 VERIFICATION
-      const response = await fetch(`https://control.msg91.com/api/v5/otp/verify?otp=${otp}&mobile=${cleanMobile}`, {
-        method: 'GET',
-        headers: { 'authkey': MSG91_AUTH_KEY }
-      });
-      const data = await response.json();
-      if (data.type === 'success') isValid = true;
-    } else {
-      // FALLBACK TO MOCK
-      const result = await pool.query(
-        'SELECT * FROM otp_sessions WHERE mobile = $1 AND otp_code = $2 AND expires_at > NOW() AND used = FALSE ORDER BY created_at DESC LIMIT 1',
-        [cleanMobile, otp]
-      );
-      if (result.rows.length > 0) {
-        isValid = true;
-        await pool.query('UPDATE otp_sessions SET used = TRUE WHERE id = $1', [result.rows[0].id]);
+    try {
+      // Call Supabase Edge Function to generate and send OTP
+      const supabaseUrl = process.env.SUPABASE_URL || 'https://wavdphwibwuykxvboytq.supabase.co';
+      const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  
+      if (!supabaseAnonKey) {
+          throw new Error('SUPABASE_ANON_KEY is missing. Real OTP flow cannot proceed.');
       }
+  
+      console.log(`[AUTH] Calling Edge Function at ${supabaseUrl}/functions/v1/otp for ${mobile}...`);
+      
+      const response = await axios.post(`${supabaseUrl}/functions/v1/otp`, {
+        action: 'request-otp',
+        payload: { mobile }
+      }, {
+        headers: { 
+          'Authorization': `Bearer ${supabaseAnonKey}`, 
+          'apikey': supabaseAnonKey,
+          'Content-Type': 'application/json' 
+        },
+        timeout: 15000 // 15s timeout for edge call
+      });
+  
+      console.log(`[AUTH] Edge Function Response for ${mobile}:`, JSON.stringify(response.data));
+      if (!response.data?.success) {
+        return res.status(400).json({
+          error: response.data?.error || 'OTP request failed',
+          details: response.data
+        });
+      }
+  
+      res.json(response.data);
+    } catch (err) {
+      console.error('Edge Function Request Error:', err.response?.data || err.message);
+      res.status(500).json({ error: 'Failed to process OTP request via Edge Function', details: err.message });
     }
-
-    if (!isValid) return res.status(400).json({ error: 'Invalid or expired OTP' });
-
-    // Get or create customer account
-    let customerResult = await pool.query('SELECT * FROM customer_accounts WHERE mobile = $1', [cleanMobile]);
-    let customer;
-
-    if (customerResult.rows.length === 0) {
-      const newCustomer = await pool.query(
-        'INSERT INTO customer_accounts (mobile) VALUES ($1) RETURNING *',
-        [cleanMobile]
-      );
-      customer = newCustomer.rows[0];
-    } else {
-      customer = customerResult.rows[0];
-    }
-
-    // Generate JWT
+  });
+  
+  app.post('/api/auth/verify-otp', async (req, res) => {
+    const { mobile, otp } = req.body;
+    if (!mobile || !otp) return res.status(400).json({ error: 'Mobile and OTP required' });
+  
+    try {
+      const supabaseUrl = process.env.SUPABASE_URL || 'https://wavdphwibwuykxvboytq.supabase.co';
+      const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+  
+      if (!supabaseAnonKey) {
+          throw new Error('SUPABASE_ANON_KEY is missing. Real OTP flow cannot proceed.');
+      }
+  
+      let user;
+      console.log(`[AUTH] Verifying OTP for ${mobile} via Edge Function...`);
+      const response = await axios.post(`${supabaseUrl}/functions/v1/otp`, {
+        action: 'verify-otp',
+        payload: { mobile, otp }
+      }, {
+        headers: { 
+          'Authorization': `Bearer ${supabaseAnonKey}`, 
+          'apikey': supabaseAnonKey,
+          'Content-Type': 'application/json' 
+        },
+        timeout: 10000
+      });
+      if (!response.data?.success || !response.data?.user) {
+        return res.status(400).json({
+          error: response.data?.error || 'OTP verification failed',
+          details: response.data
+        });
+      }
+      user = response.data.user;
+  
+      console.log(`[AUTH] OTP verified for ${mobile}, generating local JWT...`);    // Generate Supabase-style JWT locally in Node server
     const token = jwt.sign(
-      { id: customer.id, mobile: customer.mobile, name: customer.name },
+      { 
+        sub: user.id.toString(), 
+        mobile: user.mobile, 
+        role: 'authenticated',
+        aud: 'authenticated',
+        iat: Math.floor(Date.now() / 1000)
+      },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
 
-    res.json({ success: true, token, user: customer });
+    res.json({ success: true, token, user });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Edge Function Verify Error:', err.response?.data || err.message);
+    res.status(400).json({ error: err.response?.data?.error || 'Verification service error' });
   }
 });
 
@@ -949,8 +997,7 @@ app.post('/api/auth/login-mobile-verified', async (req, res) => {
       });
     }
 
-    let cleanMobile = String(verifiedMobile).replace(/\D/g, '');
-    if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
+    const cleanMobile = normalizeMobile(verifiedMobile);
 
     let customerResult = await pool.query(
       'SELECT * FROM customer_accounts WHERE mobile = $1', [cleanMobile]
@@ -968,7 +1015,14 @@ app.post('/api/auth/login-mobile-verified', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: customer.id, mobile: customer.mobile, name: customer.name },
+      {
+        id: customer.id,
+        sub: customer.id.toString(),
+        mobile: customer.mobile,
+        name: customer.name,
+        role: 'authenticated',
+        aud: 'authenticated'
+      },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
@@ -986,7 +1040,10 @@ app.post('/api/auth/login-mobile-verified', async (req, res) => {
 
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, mobile, name, email FROM customer_accounts WHERE id = $1', [req.user.id]);
+    const userId = req.user.id || req.user.sub;
+    if (!userId) return res.status(401).json({ error: 'Invalid auth token payload' });
+
+    const result = await pool.query('SELECT id, mobile, name, email FROM customer_accounts WHERE id = $1', [userId]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     res.json(result.rows[0]);
   } catch (err) {
