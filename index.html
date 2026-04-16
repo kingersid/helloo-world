@@ -12,6 +12,7 @@
         href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,400&display=swap"
         rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         :root {
@@ -584,6 +585,7 @@
         <a href="#" class="nav-link active" id="navDashboard">Dashboard</a>
         <a href="#" class="nav-link" id="navNewBill">New Invoice</a>
         <a href="#" class="nav-link" id="navManageBills">Manage Bills</a>
+        <a href="#" class="nav-link" id="navAnalytics">Analytics</a>
         <a href="#" class="nav-link" id="navPurchases">Purchases</a>
         <a href="#" class="nav-link" id="navSuppliers">Suppliers</a>
     </nav>
@@ -700,6 +702,68 @@
                     <!-- Loaded via JS -->
                 </tbody>
             </table>
+        </div>
+
+        <!-- Analytics Section -->
+        <div id="analyticsView" style="display: none;">
+            <h3 class="form-section-title">Sales Analytics</h3>
+            <div id="analyticsContent" style="background: white; padding: 2rem; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                
+                <h4 style="text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1.5rem; color: var(--primary); border-left: 4px solid var(--accent); padding-left: 10px;">Bill Value Statistics</h4>
+                <div class="analytics-stats-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 3rem;">
+                    <div style="padding: 1.5rem; background: #fafafa; border-radius: 4px; text-align: center;">
+                        <h4 style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase; letter-spacing: 1px;">Mean</h4>
+                        <p id="analyticsMean" style="margin: 10px 0 0; font-size: 1.6rem; font-weight: 900; color: var(--primary);">₹0.00</p>
+                    </div>
+                    <div style="padding: 1.5rem; background: #fafafa; border-radius: 4px; text-align: center;">
+                        <h4 style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase; letter-spacing: 1px;">Median</h4>
+                        <p id="analyticsMedian" style="margin: 10px 0 0; font-size: 1.6rem; font-weight: 900; color: var(--primary);">₹0.00</p>
+                    </div>
+                    <div style="padding: 1.5rem; background: #fafafa; border-radius: 4px; text-align: center;">
+                        <h4 style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase; letter-spacing: 1px;">Std. Deviation</h4>
+                        <p id="analyticsStdDev" style="margin: 10px 0 0; font-size: 1.6rem; font-weight: 900; color: var(--primary);">₹0.00</p>
+                    </div>
+                </div>
+
+                <h4 style="text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1.5rem; color: var(--primary); border-left: 4px solid var(--accent); padding-left: 10px;">Basket Size Statistics (Articles per Bill)</h4>
+                <div class="analytics-stats-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 3rem;">
+                    <div style="padding: 1.5rem; background: #fafafa; border-radius: 4px; text-align: center;">
+                        <h4 style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase; letter-spacing: 1px;">Avg. Basket Size</h4>
+                        <p id="analyticsAvgBasket" style="margin: 10px 0 0; font-size: 1.6rem; font-weight: 900; color: var(--primary);">0.0</p>
+                    </div>
+                    <div style="padding: 1.5rem; background: #fafafa; border-radius: 4px; text-align: center;">
+                        <h4 style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase; letter-spacing: 1px;">Median Articles</h4>
+                        <p id="analyticsMedianBasket" style="margin: 10px 0 0; font-size: 1.6rem; font-weight: 900; color: var(--primary);">0</p>
+                    </div>
+                    <div style="padding: 1.5rem; background: #fafafa; border-radius: 4px; text-align: center;">
+                        <h4 style="margin: 0; font-size: 0.75rem; color: #777; text-transform: uppercase; letter-spacing: 1px;">Std. Deviation</h4>
+                        <p id="analyticsStdDevBasket" style="margin: 10px 0 0; font-size: 1.6rem; font-weight: 900; color: var(--primary);">0.0</p>
+                    </div>
+                </div>
+
+                <div id="analyticsLoading" style="text-align: center; padding: 50px; font-style: italic; color: #777;">
+                    Fetching latest distribution data...
+                </div>
+                <div id="analyticsError" style="display: none; text-align: center; padding: 50px; color: var(--danger);">
+                    Unable to load distribution data.
+                </div>
+
+                <div id="chartContainer" style="display: none;">
+                    <div style="margin-bottom: 4rem;">
+                        <h4 style="text-align: center; margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 1px;">Bill Value Distribution</h4>
+                        <div style="position: relative; height: 350px; width: 100%;">
+                            <canvas id="distributionChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 style="text-align: center; margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 1px;">Basket Size Distribution</h4>
+                        <div style="position: relative; height: 350px; width: 100%;">
+                            <canvas id="basketChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Billing Form Section -->
@@ -922,12 +986,14 @@
         const dashboard = document.getElementById('dashboard');
         const billForm = document.getElementById('billForm');
         const manageBillsView = document.getElementById('manageBillsView');
+        const analyticsView = document.getElementById('analyticsView');
         const purchasesView = document.getElementById('purchasesView');
         const suppliersView = document.getElementById('suppliersView');
 
         const navDashboard = document.getElementById('navDashboard');
         const navNewBill = document.getElementById('navNewBill');
         const navManageBills = document.getElementById('navManageBills');
+        const navAnalytics = document.getElementById('navAnalytics');
         const navPurchases = document.getElementById('navPurchases');
         const navSuppliers = document.getElementById('navSuppliers');
 
@@ -936,6 +1002,9 @@
         const itemsBody = document.getElementById('itemsBody');
         const addItemBtn = document.getElementById('addItemBtn');
         const grandTotalDisplay = document.getElementById('grandTotalDisplay');
+
+        let distributionChart = null;
+        let basketChart = null;
 
         // Customer Autocomplete Logic
         const custNameInput = document.getElementById('custName');
@@ -995,8 +1064,8 @@
         // Navigation Switcher
         function showView(view, isEdit = false) {
             // Hide all views first
-            [dashboard, billForm, manageBillsView, purchasesView, suppliersView].forEach(v => v.style.display = 'none');
-            [navDashboard, navNewBill, navManageBills, navPurchases, navSuppliers].forEach(l => l.classList.remove('active'));
+            [dashboard, billForm, manageBillsView, analyticsView, purchasesView, suppliersView].forEach(v => v.style.display = 'none');
+            [navDashboard, navNewBill, navManageBills, navAnalytics, navPurchases, navSuppliers].forEach(l => l.classList.remove('active'));
             newBillBtn.parentElement.style.display = 'none';
 
             if (view === 'form') {
@@ -1027,6 +1096,10 @@
                 manageBillsView.style.display = 'block';
                 navManageBills.classList.add('active');
                 loadAllBills();
+            } else if (view === 'analytics') {
+                analyticsView.style.display = 'block';
+                navAnalytics.classList.add('active');
+                loadAnalytics();
             } else if (view === 'purchases') {
                 purchasesView.style.display = 'block';
                 navPurchases.classList.add('active');
@@ -1065,6 +1138,7 @@
         navDashboard.addEventListener('click', (e) => { e.preventDefault(); showView('dashboard'); });
         navNewBill.addEventListener('click', (e) => { e.preventDefault(); showView('form'); });
         navManageBills.addEventListener('click', (e) => { e.preventDefault(); showView('manage'); });
+        navAnalytics.addEventListener('click', (e) => { e.preventDefault(); showView('analytics'); });
         navPurchases.addEventListener('click', (e) => { e.preventDefault(); showView('purchases'); });
         navSuppliers.addEventListener('click', (e) => { e.preventDefault(); showView('suppliers'); });
 
@@ -1132,6 +1206,93 @@
                 }
             } catch (err) {
                 console.error('Error loading dashboard:', err);
+            }
+        }
+
+        async function loadAnalytics() {
+            const loading = document.getElementById('analyticsLoading');
+            const error = document.getElementById('analyticsError');
+            const container = document.getElementById('chartContainer');
+
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            container.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/dashboard');
+                const data = await response.json();
+                
+                if (!data.billDistribution || !data.articleDistribution) {
+                    throw new Error('Analytics data not found. Please restart the server.');
+                }
+
+                loading.style.display = 'none';
+                container.style.display = 'block';
+
+                // Update Stats
+                document.getElementById('analyticsMean').innerText = `₹${parseFloat(data.summary.avg_bill_value || 0).toFixed(2)}`;
+                document.getElementById('analyticsMedian').innerText = `₹${parseFloat(data.summary.median_bill_value || 0).toFixed(2)}`;
+                document.getElementById('analyticsStdDev').innerText = `₹${parseFloat(data.summary.std_dev_bill_value || 0).toFixed(2)}`;
+                
+                document.getElementById('analyticsAvgBasket').innerText = parseFloat(data.summary.avg_basket_size || 0).toFixed(1);
+                document.getElementById('analyticsMedianBasket').innerText = parseFloat(data.summary.median_basket_size || 0).toFixed(0);
+                document.getElementById('analyticsStdDevBasket').innerText = parseFloat(data.summary.std_dev_basket_size || 0).toFixed(2);
+
+                const commonOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1, font: { family: 'Merriweather' } } },
+                        x: { ticks: { font: { family: 'Merriweather' } } }
+                    }
+                };
+
+                // 1. Bill Value Chart
+                const ctxDist = document.getElementById('distributionChart').getContext('2d');
+                if (distributionChart) distributionChart.destroy();
+                distributionChart = new Chart(ctxDist, {
+                    type: 'bar',
+                    data: {
+                        labels: data.billDistribution.map(d => d.range),
+                        datasets: [{
+                            data: data.billDistribution.map(d => parseInt(d.count)),
+                            backgroundColor: 'rgba(212, 175, 55, 0.6)',
+                            borderColor: 'rgba(212, 175, 55, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        ...commonOptions,
+                        plugins: { ...commonOptions.plugins, tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw} bills` } } }
+                    }
+                });
+
+                // 2. Basket Size Chart
+                const ctxBasket = document.getElementById('basketChart').getContext('2d');
+                if (basketChart) basketChart.destroy();
+                basketChart = new Chart(ctxBasket, {
+                    type: 'bar',
+                    data: {
+                        labels: data.articleDistribution.map(d => d.range),
+                        datasets: [{
+                            data: data.articleDistribution.map(d => parseInt(d.count)),
+                            backgroundColor: 'rgba(44, 62, 80, 0.6)',
+                            borderColor: 'rgba(44, 62, 80, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        ...commonOptions,
+                        plugins: { ...commonOptions.plugins, tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw} bills` } } }
+                    }
+                });
+
+            } catch (err) {
+                console.error('Error loading analytics:', err);
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.innerText = `Error: ${err.message}`;
             }
         }
 

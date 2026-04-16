@@ -20,7 +20,7 @@ async function testQuery() {
         SELECT DISTINCT ON (transaction_id) 
                transaction_id, customer_id, bill_date, grand_total 
         FROM bills
-        ORDER BY transaction_id
+        ORDER BY transaction_id, id ASC
       ),
       lifetime_data AS (
         SELECT 

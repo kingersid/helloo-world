@@ -378,7 +378,12 @@ app.get('/api/dashboard', async (req, res) => {
         SELECT DISTINCT ON (transaction_id) 
                transaction_id, customer_id, bill_date, grand_total 
         FROM bills
-        ORDER BY transaction_id
+        ORDER BY transaction_id, id ASC
+      ),
+      basket_data AS (
+        SELECT transaction_id, SUM(pieces) as total_pieces
+        FROM bills
+        GROUP BY transaction_id
       ),
       lifetime_data AS (
         SELECT 
@@ -412,16 +417,84 @@ app.get('/api/dashboard', async (req, res) => {
         (SELECT COALESCE(SUM(total_amount), 0) FROM purchases) as total_investment,
         pd.total_pieces as total_pieces_sold,
         CASE WHEN ld.total_bills > 0 THEN ld.total_rev / ld.total_bills ELSE 0 END as avg_bill_value,
+        (SELECT COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY grand_total), 0) FROM unique_bills) as median_bill_value,
+        (SELECT COALESCE(STDDEV_SAMP(grand_total), 0) FROM unique_bills) as std_dev_bill_value,
         CASE WHEN pd.total_pieces > 0 THEN ld.total_rev / pd.total_pieces ELSE 0 END as avg_selling_price,
-        CASE WHEN ld.total_bills > 0 THEN CAST(pd.total_pieces AS DECIMAL) / ld.total_bills ELSE 0 END as avg_basket_size
+        CASE WHEN ld.total_bills > 0 THEN CAST(pd.total_pieces AS DECIMAL) / ld.total_bills ELSE 0 END as avg_basket_size,
+        (SELECT COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY total_pieces), 0) FROM basket_data) as median_basket_size,
+        (SELECT COALESCE(STDDEV_SAMP(total_pieces), 0) FROM basket_data) as std_dev_basket_size
       FROM lifetime_data ld, pieces_data pd
     `);
 
     console.log("Calculated Dashboard Stats:", stats.rows[0]);
 
+    // 3. Bill distribution for charts
+    const billDistribution = await client.query(`
+      SELECT
+        range,
+        COUNT(*) as count
+      FROM (
+        SELECT
+          CASE
+            WHEN grand_total < 2000 THEN '0-2000'
+            WHEN grand_total >= 2000 AND grand_total < 3000 THEN '2000-3000'
+            WHEN grand_total >= 3000 AND grand_total < 4000 THEN '3000-4000'
+            WHEN grand_total >= 4000 AND grand_total < 5000 THEN '4000-5000'
+            WHEN grand_total >= 5000 AND grand_total < 6000 THEN '5000-6000'
+            WHEN grand_total >= 6000 AND grand_total < 7000 THEN '6000-7000'
+            WHEN grand_total >= 7000 AND grand_total < 8000 THEN '7000-8000'
+            WHEN grand_total >= 8000 AND grand_total < 9000 THEN '8000-9000'
+            WHEN grand_total >= 9000 AND grand_total < 10000 THEN '9000-10000'
+            ELSE '10000+'
+          END as range,
+          CASE
+            WHEN grand_total < 2000 THEN 1
+            WHEN grand_total < 3000 THEN 2
+            WHEN grand_total < 4000 THEN 3
+            WHEN grand_total < 5000 THEN 4
+            WHEN grand_total < 6000 THEN 5
+            WHEN grand_total < 7000 THEN 6
+            WHEN grand_total < 8000 THEN 7
+            WHEN grand_total < 9000 THEN 8
+            WHEN grand_total < 10000 THEN 9
+            ELSE 10
+          END as sort_order
+        FROM (
+            SELECT DISTINCT ON (transaction_id) grand_total
+            FROM bills
+            ORDER BY transaction_id, id ASC
+        ) unique_bills
+      ) ranges
+      GROUP BY range, sort_order
+      ORDER BY sort_order
+    `);
+
+    // 4. Article distribution (Basket Size)
+    const articleDistribution = await client.query(`
+      SELECT
+        CASE
+          WHEN total_pieces = 1 THEN '1 Article'
+          WHEN total_pieces = 2 THEN '2 Articles'
+          WHEN total_pieces = 3 THEN '3 Articles'
+          WHEN total_pieces = 4 THEN '4 Articles'
+          ELSE '5+ Articles'
+        END as range,
+        COUNT(*) as count,
+        MIN(total_pieces) as sort_val
+      FROM (
+        SELECT transaction_id, SUM(pieces) as total_pieces
+        FROM bills
+        GROUP BY transaction_id
+      ) t
+      GROUP BY 1
+      ORDER BY sort_val ASC
+    `);
+
     res.json({
       recentBills: lastBills.rows,
-      summary: { ...stats.rows[0], __debug_ver: 2 }
+      summary: { ...stats.rows[0], __debug_ver: 3 },
+      billDistribution: billDistribution.rows,
+      articleDistribution: articleDistribution.rows
     });
   } catch (err) {
     console.error("Error fetching dashboard:", err);
