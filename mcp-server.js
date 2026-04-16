@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * MCP Server for Hello World Billing System
- * Removed MCP server functionality - keeping only billing API
+ * Removed MCP server functionality - keeping minimal structure
  */
 
 const { Server } = require('net');
@@ -103,12 +103,5 @@ process.on('SIGTERM', () => {
     pool.end();
   }
 });
-
-// Start the server
-if (require.main === module) {
-  const port = process.env.MCP_PORT || 8080;
-  const server = new BillingMCPServer();
-  server.start(port);
-}
 
 module.exports = BillingMCPServer;
