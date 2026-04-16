@@ -1,0 +1,17 @@
+{
+  "name": "hello-world-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for Hello World Billing System - Database Access for AI Agents",
+  "main": "mcp-server.js",
+  "scripts": {
+    "start": "node mcp-server.js",
+    "dev": "node mcp-server.js"
+  },
+  "dependencies": {
+    "pg": "^8.11.3",
+    "dotenv": "^17.3.1"
+  },
+  "keywords": ["mcp", "database", "billing", "postgresql"],
+  "author": "",
+  "license": "MIT"
+}

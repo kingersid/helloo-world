@@ -2,21 +2,19 @@
   "version": 2,
   "builds": [
     {
-      "src": "server.js",
+      "src": "mcp-server.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["assets/**", "public/**", "index.html"]
+        "installCommand": "npm install",
+        "devCommand": "node mcp-server.js",
+        "includeFiles": ["mcp-server.js", "mcp-server-package.json"]
       }
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/server.js"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/server.js"
+      "src": "/(.*)",
+      "dest": "/mcp-server.js"
     }
   ]
 }

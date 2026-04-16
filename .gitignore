@@ -3,3 +3,5 @@ backup.json
 export_data.js
 import_data_koyeb.js
 .env
+.vercel
+.env*.local
