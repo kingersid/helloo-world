@@ -1,8 +1,8 @@
-require('dotenv').config();
 const express = require('express');
 const { Pool } = require('pg');
 const path = require('path');
 const crypto = require('crypto');
+
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -52,7 +52,7 @@ const initDB = async (retries = 5) => {
   }
   while (retries > 0) {
     try {
-      const client = await pool.connect();
+      const client = await getPool().connect();
       try {
         await client.query(`
           CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -97,47 +97,7 @@ const initDB = async (retries = 5) => {
             payment_mode TEXT NOT NULL,
             purchase_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          );
-
-          -- Migration: Add bill_date if it doesn't exist
-          DO $$ 
-          BEGIN 
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='bills' AND column_name='bill_date') THEN
-              ALTER TABLE bills ADD COLUMN bill_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-            END IF;
-          END $$;
-
-          -- Migration: Add transaction_id if it doesn't exist
-          DO $$ 
-          BEGIN 
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='bills' AND column_name='transaction_id') THEN
-              ALTER TABLE bills ADD COLUMN transaction_id UUID DEFAULT gen_random_uuid();
-            END IF;
-          END $$;
-
-          -- Migration: Ensure all rows have a transaction_id (for those missed by column addition)
-          UPDATE bills SET transaction_id = gen_random_uuid() WHERE transaction_id IS NULL;
-
-          -- Migration: Add bill_no if it doesn't exist
-          DO $$ 
-          BEGIN 
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='bills' AND column_name='bill_no') THEN
-              ALTER TABLE bills ADD COLUMN bill_no TEXT;
-            END IF;
-          END $$;
-
-          -- Re-number all bills sequentially starting from 1
-          -- Based on transaction groups, ordered by date
-          WITH numbered_transactions AS (
-            SELECT transaction_id, ROW_NUMBER() OVER (ORDER BY MIN(bill_date) ASC, MIN(id) ASC) as seq_no
-            FROM bills
-            GROUP BY transaction_id
-          )
-          UPDATE bills b
-          SET bill_no = n.seq_no::TEXT
-          FROM numbered_transactions n
-          WHERE b.transaction_id = n.transaction_id;
-        `);
+          );`);
         console.log("Database tables initialized and bills re-numbered.");
         return;
       } finally {
@@ -155,7 +115,7 @@ initDB();
 
 app.post('/api/bills', async (req, res) => {
   const { name, mobile, billDate, billNo, items, grandTotal, transactionId, customerId: providedCustomerId } = req.body;
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     await client.query('BEGIN');
 
@@ -181,7 +141,7 @@ app.post('/api/bills', async (req, res) => {
     // 2. Determine Bill Number
     let finalBillNo = billNo;
     if (!finalBillNo) {
-      const maxNoResult = await client.query('SELECT MAX(CAST(bill_no AS INTEGER)) as max_no FROM bills WHERE bill_no ~ \'^[0-9]+$\'');
+      const maxNoResult = await client.query('SELECT MAX(CAST(bill_no AS INTEGER)) as max_no FROM bills WHERE bill_no ~ \'^\\[0-9]+$\'');
       const maxNo = maxNoResult.rows[0].max_no || 0;
       finalBillNo = (maxNo + 1).toString();
     }
@@ -364,7 +324,7 @@ app.get('/api/dashboard', async (req, res) => {
   console.log("Dashboard API hit. DATABASE_URL length:", process.env.DATABASE_URL ? process.env.DATABASE_URL.length : 'undefined');
   let client;
   try {
-    client = await pool.connect();
+    client = await getPool().connect();
     console.log("Database connection successful in dashboard handler.");
     // 1. Last 10 bills (grouped by transaction_id to get unique transactions)
     const lastBills = await client.query(`
