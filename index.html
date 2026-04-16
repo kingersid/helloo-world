@@ -975,7 +975,7 @@
         });
 
         // Navigation Switcher
-        function showView(view) {
+        function showView(view, isEdit = false) {
             // Hide all views first
             [dashboard, billForm, manageBillsView, purchasesView, suppliersView].forEach(v => v.style.display = 'none');
             [navDashboard, navNewBill, navManageBills, navPurchases, navSuppliers].forEach(l => l.classList.remove('active'));
@@ -984,13 +984,27 @@
             if (view === 'form') {
                 billForm.style.display = 'block';
                 navNewBill.classList.add('active');
-                document.getElementById('formTitle').innerText = 'New Invoice Details';
-                document.getElementById('editTransactionId').value = '';
+                document.getElementById('formTitle').innerText = isEdit ? 'Edit Invoice Details' : 'New Invoice Details';
+                
                 resetForm();
 
-                const now = new Date();
-                now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-                document.getElementById('billDate').value = now.toISOString().slice(0, 16);
+                if (!isEdit) {
+                    document.getElementById('editTransactionId').value = '';
+                    
+                    const now = new Date();
+                    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                    document.getElementById('billDate').value = now.toISOString().slice(0, 16);
+
+                    // Auto-fetch next bill number
+                    fetch('/api/bills/next-number')
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.nextBillNo) {
+                                document.getElementById('billNo').value = data.nextBillNo;
+                            }
+                        })
+                        .catch(err => console.error('Error fetching next bill no:', err));
+                }
             } else if (view === 'manage') {
                 manageBillsView.style.display = 'block';
                 navManageBills.classList.add('active');
@@ -1137,8 +1151,7 @@
                 }
                 const bill = await response.json();
 
-                showView('form');
-                document.getElementById('formTitle').innerText = 'Edit Invoice Details';
+                showView('form', true);
                 document.getElementById('editTransactionId').value = transactionId;
 
                 document.getElementById('custName').value = bill.customerName || 'Walk-in';

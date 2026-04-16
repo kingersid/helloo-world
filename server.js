@@ -237,6 +237,17 @@ app.get('/api/bills', async (req, res) => {
   }
 });
 
+app.get('/api/bills/next-number', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT MAX(CAST(bill_no AS INTEGER)) as max_no FROM bills WHERE bill_no ~ '^[0-9]+$'");
+    const nextNo = (result.rows[0].max_no || 0) + 1;
+    res.json({ nextBillNo: nextNo.toString() });
+  } catch (err) {
+    console.error("Error fetching next bill number:", err);
+    res.status(500).json({ error: 'Failed to fetch next bill number' });
+  }
+});
+
 app.get('/api/bills/:transactionId', async (req, res) => {
   const { transactionId } = req.params;
   console.log(`Fetching bill details for transactionId: ${transactionId}`);
