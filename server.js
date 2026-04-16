@@ -45,6 +45,10 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
 // Root route to serve index.html explicitly (required for Vercel/some serverless)
+app.get("/logo.png", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "logo.png"));
+});
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
