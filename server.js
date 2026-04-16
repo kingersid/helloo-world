@@ -56,14 +56,14 @@ const initDB = async (retries = 5) => {
       try {
         await client.query(`
           CREATE EXTENSION IF NOT EXISTS pgcrypto;
-          
+
           CREATE TABLE IF NOT EXISTS customers (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             mobile TEXT,
             UNIQUE(name, mobile)
           );
-          
+
           CREATE TABLE IF NOT EXISTS bills (
             id SERIAL PRIMARY KEY,
             transaction_id UUID DEFAULT gen_random_uuid(),
@@ -177,9 +177,9 @@ app.get('/api/customers/search', async (req, res) => {
   try {
     // Prioritize results that start with the query, then those that contain it
     const result = await getPool().query(
-      `SELECT id, name, mobile FROM customers 
-       WHERE name ILIKE $1 
-       ORDER BY (CASE WHEN name ILIKE $2 THEN 0 ELSE 1 END), name ASC 
+      `SELECT id, name, mobile FROM customers
+       WHERE name ILIKE $1
+       ORDER BY (CASE WHEN name ILIKE $2 THEN 0 ELSE 1 END), name ASC
        LIMIT 10`,
       [`%${name}%`, `${name}%`]
     );
@@ -193,7 +193,7 @@ app.get('/api/customers/search', async (req, res) => {
 app.get('/api/bills', async (req, res) => {
   try {
     const result = await getPool().query(`
-      SELECT b.transaction_id::TEXT as transaction_id, b.bill_no, b.bill_date, b.grand_total, 
+      SELECT b.transaction_id::TEXT as transaction_id, b.bill_no, b.bill_date, b.grand_total,
              COALESCE(c.name, 'Walk-in') as customer_name, c.mobile,
              SUM(b.pieces) as total_pieces
       FROM bills b
@@ -229,12 +229,12 @@ app.get('/api/bills/:transactionId', async (req, res) => {
       LEFT JOIN customers c ON b.customer_id = c.id
       WHERE b.transaction_id::TEXT = $1
     `, [transactionId]);
-    
+
     if (billItems.rows.length === 0) {
       console.log(`No bill found for transactionId: ${transactionId}`);
       return res.status(404).json({ error: 'Bill not found' });
     }
-    
+
     console.log(`Found ${billItems.rows.length} items for transactionId: ${transactionId}`);
     res.json({
       transactionId,
@@ -296,9 +296,9 @@ app.post('/api/suppliers', async (req, res) => {
 app.get('/api/purchases', async (req, res) => {
   try {
     const result = await getPool().query(`
-      SELECT p.*, s.name as supplier_name 
-      FROM purchases p 
-      JOIN suppliers s ON p.supplier_id = s.id 
+      SELECT p.*, s.name as supplier_name
+      FROM purchases p
+      JOIN suppliers s ON p.supplier_id = s.id
       ORDER BY p.purchase_date DESC
     `);
     res.json(result.rows);
@@ -328,11 +328,11 @@ app.get('/api/dashboard', async (req, res) => {
     console.log("Database connection successful in dashboard handler.");
     // 1. Last 10 bills (grouped by transaction_id to get unique transactions)
     const lastBills = await client.query(`
-      SELECT b.transaction_id::TEXT as transaction_id, 
-             b.bill_no, 
-             b.bill_date, 
-             COALESCE(c.name, 'Walk-in') as customer_name, 
-             b.grand_total, 
+      SELECT b.transaction_id::TEXT as transaction_id,
+             b.bill_no,
+             b.bill_date,
+             COALESCE(c.name, 'Walk-in') as customer_name,
+             b.grand_total,
              SUM(b.pieces) as total_pieces
       FROM bills b
       LEFT JOIN customers c ON b.customer_id = c.id
@@ -344,8 +344,8 @@ app.get('/api/dashboard', async (req, res) => {
     // 2. Summary stats
     const stats = await client.query(`
       WITH unique_bills AS (
-        SELECT DISTINCT ON (transaction_id) 
-               transaction_id, customer_id, bill_date, grand_total 
+        SELECT DISTINCT ON (transaction_id)
+               transaction_id, customer_id, bill_date, grand_total
         FROM bills
         ORDER BY transaction_id, id ASC
       ),
@@ -355,7 +355,7 @@ app.get('/api/dashboard', async (req, res) => {
         GROUP BY transaction_id
       ),
       lifetime_data AS (
-        SELECT 
+        SELECT
           COALESCE(SUM(grand_total), 0) as total_rev,
           COALESCE(COUNT(*), 0) as total_bills
         FROM unique_bills
@@ -364,23 +364,23 @@ app.get('/api/dashboard', async (req, res) => {
         SELECT COALESCE(SUM(pieces), 0) as total_pieces FROM bills
       ),
       monthly_totals AS (
-        SELECT 
+        SELECT
           date_trunc('month', bill_date) as month,
           SUM(grand_total) as total
         FROM unique_bills
         WHERE bill_date >= CURRENT_DATE - INTERVAL '12 months'
         GROUP BY 1
       )
-      SELECT 
+      SELECT
         (SELECT COALESCE(SUM(grand_total), 0) FROM unique_bills WHERE date_trunc('month', bill_date) = date_trunc('month', CURRENT_DATE)) as current_month_total,
         (SELECT COALESCE(SUM(grand_total), 0) FROM unique_bills WHERE date_trunc('month', bill_date) = date_trunc('month', CURRENT_DATE - INTERVAL '1 month')) as last_month_total,
         (SELECT COALESCE(MAX(total), 0) FROM monthly_totals) as best_month_total,
         (SELECT COALESCE(SUM(grand_total), 0) FROM unique_bills WHERE date_trunc('year', bill_date) = date_trunc('year', CURRENT_DATE)) as year_total,
         ld.total_rev as lifetime_total,
         (SELECT name FROM (
-          SELECT COALESCE(c.name, 'Walk-in') as name, SUM(b.grand_total) as total_spent 
-          FROM unique_bills b 
-          LEFT JOIN customers c ON b.customer_id = c.id 
+          SELECT COALESCE(c.name, 'Walk-in') as name, SUM(b.grand_total) as total_spent
+          FROM unique_bills b
+          LEFT JOIN customers c ON b.customer_id = c.id
           GROUP BY 1 ORDER BY total_spent DESC LIMIT 1
         ) t) as top_customer,
         (SELECT COALESCE(SUM(total_amount), 0) FROM purchases) as total_investment,
