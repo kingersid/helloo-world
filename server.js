@@ -6,6 +6,17 @@ const crypto = require('crypto');
 const app = express();
 const port = process.env.PORT || 3000;
 
+let pool;
+const getPool = () => {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    });
+  }
+  return pool;
+};
+
 // Request logger
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
@@ -24,8 +35,6 @@ const poolConfig = {
 if (dbUrl && (dbUrl.includes('proxy.rlwy.net') || dbUrl.includes('koyeb.app') || dbUrl.includes('supabase.co') || process.env.NODE_ENV === 'production')) {
   poolConfig.ssl = { rejectUnauthorized: false };
 }
-
-const pool = new Pool(poolConfig);
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
@@ -207,7 +216,7 @@ app.get('/api/customers/search', async (req, res) => {
   if (!name) return res.json([]);
   try {
     // Prioritize results that start with the query, then those that contain it
-    const result = await pool.query(
+    const result = await getPool().query(
       `SELECT id, name, mobile FROM customers 
        WHERE name ILIKE $1 
        ORDER BY (CASE WHEN name ILIKE $2 THEN 0 ELSE 1 END), name ASC 
@@ -223,7 +232,7 @@ app.get('/api/customers/search', async (req, res) => {
 
 app.get('/api/bills', async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await getPool().query(`
       SELECT b.transaction_id::TEXT as transaction_id, b.bill_no, b.bill_date, b.grand_total, 
              COALESCE(c.name, 'Walk-in') as customer_name, c.mobile,
              SUM(b.pieces) as total_pieces
@@ -241,7 +250,7 @@ app.get('/api/bills', async (req, res) => {
 
 app.get('/api/bills/next-number', async (req, res) => {
   try {
-    const result = await pool.query("SELECT MAX(CAST(bill_no AS INTEGER)) as max_no FROM bills WHERE bill_no ~ '^[0-9]+$'");
+    const result = await getPool().query("SELECT MAX(CAST(bill_no AS INTEGER)) as max_no FROM bills WHERE bill_no ~ '^[0-9]+$'");
     const nextNo = (result.rows[0].max_no || 0) + 1;
     res.json({ nextBillNo: nextNo.toString() });
   } catch (err) {
@@ -254,7 +263,7 @@ app.get('/api/bills/:transactionId', async (req, res) => {
   const { transactionId } = req.params;
   console.log(`Fetching bill details for transactionId: ${transactionId}`);
   try {
-    const billItems = await pool.query(`
+    const billItems = await getPool().query(`
       SELECT b.*, b.transaction_id::TEXT as transaction_id, COALESCE(c.name, 'Walk-in') as customer_name, c.mobile
       FROM bills b
       LEFT JOIN customers c ON b.customer_id = c.id
@@ -291,7 +300,7 @@ app.delete('/api/bills/:transactionId', async (req, res) => {
   const { transactionId } = req.params;
   console.log(`Attempting to delete bill with transactionId: ${transactionId}`);
   try {
-    const result = await pool.query('DELETE FROM bills WHERE transaction_id = $1', [transactionId]);
+    const result = await getPool().query('DELETE FROM bills WHERE transaction_id = $1', [transactionId]);
     console.log(`Successfully deleted items for transactionId: ${transactionId}. Rows affected: ${result.rowCount}`);
     res.json({ success: true, rowsAffected: result.rowCount });
   } catch (err) {
@@ -303,7 +312,7 @@ app.delete('/api/bills/:transactionId', async (req, res) => {
 // Suppliers API
 app.get('/api/suppliers', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM suppliers ORDER BY name ASC');
+    const result = await getPool().query('SELECT * FROM suppliers ORDER BY name ASC');
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -313,7 +322,7 @@ app.get('/api/suppliers', async (req, res) => {
 app.post('/api/suppliers', async (req, res) => {
   const { name, mobile, address } = req.body;
   try {
-    const result = await pool.query(
+    const result = await getPool().query(
       'INSERT INTO suppliers (name, mobile, address) VALUES ($1, $2, $3) RETURNING *',
       [name, mobile, address]
     );
@@ -326,7 +335,7 @@ app.post('/api/suppliers', async (req, res) => {
 // Purchases API
 app.get('/api/purchases', async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await getPool().query(`
       SELECT p.*, s.name as supplier_name 
       FROM purchases p 
       JOIN suppliers s ON p.supplier_id = s.id 
@@ -341,7 +350,7 @@ app.get('/api/purchases', async (req, res) => {
 app.post('/api/purchases', async (req, res) => {
   const { supplier_id, article_name, pieces, base_amount, gst_amount, total_amount, payment_mode, purchase_date } = req.body;
   try {
-    const result = await pool.query(`
+    const result = await getPool().query(`
       INSERT INTO purchases (supplier_id, article_name, pieces, base_amount, gst_amount, total_amount, payment_mode, purchase_date)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *
     `, [supplier_id, article_name, pieces, base_amount, gst_amount, total_amount, payment_mode, purchase_date || new Date()]);

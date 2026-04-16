@@ -11,11 +11,18 @@ const { Pool } = require('pg');
 // Read environment variables
 require('dotenv').config();
 
-// Database connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-});
+let pool;
+
+// Database connection pool - only create when needed
+const getPool = () => {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL || process.env.DATABASE_PUBLIC_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    });
+  }
+  return pool;
+};
 
 // MCP Server implementation using stdio protocol
 class BillingMCPServer {
@@ -119,7 +126,7 @@ class BillingMCPServer {
 
   async searchCustomers(params) {
     const { query, limit = 10 } = params;
-    const result = await pool.query(
+    const result = await getPool().query(
       `SELECT id, name, mobile FROM customers
        WHERE name ILIKE $1 OR mobile ILIKE $1
        ORDER BY name ASC
@@ -131,7 +138,7 @@ class BillingMCPServer {
 
   async getCustomer(params) {
     const { id } = params;
-    const result = await pool.query(
+    const result = await getPool().query(
       'SELECT * FROM customers WHERE id = $1',
       [id]
     );
@@ -145,7 +152,7 @@ class BillingMCPServer {
 
   async getCustomerTransactions(params) {
     const { customerId } = params;
-    const result = await pool.query(
+    const result = await getPool().query(
       `SELECT b.*, c.name as customer_name
        FROM bills b
        LEFT JOIN customers c ON b.customer_id = c.id
@@ -157,7 +164,7 @@ class BillingMCPServer {
   }
 
   async getAprilTransactions() {
-    const result = await pool.query(
+    const result = await getPool().query(
       `SELECT b.*, c.name as customer_name
        FROM bills b
        LEFT JOIN customers c ON b.customer_id = c.id
@@ -168,12 +175,12 @@ class BillingMCPServer {
   }
 
   async getBillCount() {
-    const result = await pool.query('SELECT COUNT(*) as total_bills FROM bills');
+    const result = await getPool().query('SELECT COUNT(*) as total_bills FROM bills');
     return { total_bills: parseInt(result.rows[0].total_bills) };
   }
 
   async getAllBills() {
-    const result = await pool.query(`
+    const result = await getPool().query(`
       SELECT b.transaction_id::TEXT as transaction_id, b.bill_no, b.bill_date, b.grand_total,
              COALESCE(c.name, 'Walk-in') as customer_name, c.mobile,
              SUM(b.pieces) as total_pieces
@@ -186,7 +193,7 @@ class BillingMCPServer {
   }
 
   async getCustomerStatistics() {
-    const result = await pool.query(`
+    const result = await getPool().query(`
       WITH customer_stats AS (
         SELECT
           c.id,
@@ -224,6 +231,13 @@ class BillingMCPServer {
     });
   }
 }
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  if (pool) {
+    pool.end();
+  }
+});
 
 // Start the server
 if (require.main === module) {
