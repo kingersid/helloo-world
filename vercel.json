@@ -16,9 +16,5 @@
       "src": "/(.*)",
       "dest": "/server.js"
     }
-  ],
-  "staticFiles": {
-    "directory": "public",
-    "path": "/"
-  }
+  ]
 }
