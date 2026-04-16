@@ -21,6 +21,11 @@ const getPool = () => {
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
+
+// Root route to serve index.html explicitly (required for Vercel/some serverless)
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
 });
 
 // Database connection
