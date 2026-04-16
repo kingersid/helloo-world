@@ -642,6 +642,22 @@
                     <p id="totalInvestment">₹0.00</p>
                 </div>
                 <div class="summary-card">
+                    <h4>Total Pieces Sold</h4>
+                    <p id="totalPiecesSold">0</p>
+                </div>
+                <div class="summary-card">
+                    <h4>Avg. Bill Value</h4>
+                    <p id="avgBillValue">₹0.00</p>
+                </div>
+                <div class="summary-card">
+                    <h4>Avg. Selling Price</h4>
+                    <p id="avgSellingPrice">₹0.00</p>
+                </div>
+                <div class="summary-card">
+                    <h4>Avg. Basket Size</h4>
+                    <p id="avgBasketSize">0.0</p>
+                </div>
+                <div class="summary-card">
                     <h4>Top Client</h4>
                     <p id="topCustName" style="font-size: 1.5rem; margin-top: 15px;">None</p>
                 </div>
@@ -654,6 +670,7 @@
                         <th>Date</th>
                         <th>Bill No.</th>
                         <th>Client Name</th>
+                        <th style="text-align: center;">Pieces</th>
                         <th style="text-align: right;">Total Amount</th>
                         <th style="text-align: center;">Actions</th>
                     </tr>
@@ -674,6 +691,7 @@
                         <th>Bill No.</th>
                         <th>Client Name</th>
                         <th>Contact</th>
+                        <th style="text-align: center;">Pieces</th>
                         <th style="text-align: right;">Total Amount</th>
                         <th style="text-align: center;">Actions</th>
                     </tr>
@@ -1059,6 +1077,11 @@
                 const response = await fetch('/api/dashboard');
                 if (!response.ok) throw new Error('Dashboard fetch failed');
                 const data = await response.json();
+                console.log("Dashboard Summary:", data.summary);
+                console.log("Debug Version:", data.summary.__debug_ver);
+                console.log("ABV Raw:", data.summary.avg_bill_value);
+                console.log("ASP Raw:", data.summary.avg_selling_price);
+                console.log("ABS Raw:", data.summary.avg_basket_size);
 
                 // Update Summary
                 document.getElementById('monthSales').innerText = `₹${parseFloat(data.summary.current_month_total || 0).toFixed(2)}`;
@@ -1067,6 +1090,10 @@
                 document.getElementById('yearSales').innerText = `₹${parseFloat(data.summary.year_total || 0).toFixed(2)}`;
                 document.getElementById('lifetimeSales').innerText = `₹${parseFloat(data.summary.lifetime_total || 0).toFixed(2)}`;
                 document.getElementById('totalInvestment').innerText = `₹${parseFloat(data.summary.total_investment || 0).toFixed(2)}`;
+                document.getElementById('totalPiecesSold').innerText = data.summary.total_pieces_sold || '0';
+                document.getElementById('avgBillValue').innerText = `₹${parseFloat(data.summary.avg_bill_value || 0).toFixed(2)}`;
+                document.getElementById('avgSellingPrice').innerText = `₹${parseFloat(data.summary.avg_selling_price || 0).toFixed(2)}`;
+                document.getElementById('avgBasketSize').innerText = parseFloat(data.summary.avg_basket_size || 0).toFixed(1);
                 document.getElementById('topCustName').innerText = data.summary.top_customer || 'None';
 
                 // Update Recent Bills
@@ -1083,12 +1110,14 @@
                         const tId = bill.transaction_id;
                         const cName = bill.customer_name || 'Walk-in';
                         const bNo = bill.bill_no || '-';
+                        const pieces = bill.total_pieces || 0;
                         const gTotal = parseFloat(bill.grand_total || 0).toFixed(2);
 
                         row.innerHTML = `
                             <td>${date}</td>
                             <td style="font-weight: bold;">${bNo}</td>
                             <td class="cust-name-cell">${cName}</td>
+                            <td style="text-align: center;">${pieces}</td>
                             <td style="text-align: right; font-weight: 700;">₹${gTotal}</td>
                             <td style="text-align: center;">
                                 <button onclick="downloadInvoicePDF('${tId}')" style="padding: 6px 12px; font-size: 0.7rem; margin-right: 5px; background: var(--accent); border-color: var(--accent);">PDF</button>
@@ -1123,6 +1152,7 @@
                         <td style="font-weight: bold;">${bill.bill_no || '-'}</td>
                         <td class="cust-name-cell">${bill.customer_name || 'Walk-in'}</td>
                         <td>${bill.mobile || '-'}</td>
+                        <td style="text-align: center;">${bill.total_pieces || 0}</td>
                         <td style="text-align: right; font-weight: 700;">₹${parseFloat(bill.grand_total || 0).toFixed(2)}</td>
                         <td style="text-align: center;">
                             <button onclick="downloadInvoicePDF('${bill.transaction_id}')" style="padding: 6px 12px; font-size: 0.7rem; margin-right: 5px; background: var(--accent); border-color: var(--accent);">PDF</button>

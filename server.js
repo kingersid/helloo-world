@@ -224,7 +224,9 @@ app.get('/api/customers/search', async (req, res) => {
 app.get('/api/bills', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT b.transaction_id::TEXT as transaction_id, b.bill_no, b.bill_date, b.grand_total, COALESCE(c.name, 'Walk-in') as customer_name, c.mobile
+      SELECT b.transaction_id::TEXT as transaction_id, b.bill_no, b.bill_date, b.grand_total, 
+             COALESCE(c.name, 'Walk-in') as customer_name, c.mobile,
+             SUM(b.pieces) as total_pieces
       FROM bills b
       LEFT JOIN customers c ON b.customer_id = c.id
       GROUP BY b.transaction_id, b.bill_no, b.bill_date, b.grand_total, c.name, c.mobile
@@ -357,19 +359,16 @@ app.get('/api/dashboard', async (req, res) => {
     console.log("Database connection successful in dashboard handler.");
     // 1. Last 10 bills (grouped by transaction_id to get unique transactions)
     const lastBills = await client.query(`
-      SELECT * FROM (
-        SELECT DISTINCT ON (b.transaction_id) 
-               b.transaction_id::TEXT as transaction_id, 
-               b.bill_no, 
-               b.bill_date, 
-               COALESCE(c.name, \'Walk-in\') as customer_name, 
-               b.grand_total, 
-               b.created_at
-        FROM bills b
-        LEFT JOIN customers c ON b.customer_id = c.id
-        ORDER BY b.transaction_id, CASE WHEN b.bill_no ~ \'^[0-9]+$\' THEN CAST(b.bill_no AS INTEGER) ELSE 0 END DESC
-      ) sub
-      ORDER BY CASE WHEN bill_no ~ \'^[0-9]+$\' THEN CAST(bill_no AS INTEGER) ELSE 0 END DESC
+      SELECT b.transaction_id::TEXT as transaction_id, 
+             b.bill_no, 
+             b.bill_date, 
+             COALESCE(c.name, 'Walk-in') as customer_name, 
+             b.grand_total, 
+             SUM(b.pieces) as total_pieces
+      FROM bills b
+      LEFT JOIN customers c ON b.customer_id = c.id
+      GROUP BY b.transaction_id, b.bill_no, b.bill_date, b.grand_total, c.name
+      ORDER BY CASE WHEN b.bill_no ~ '^[0-9]+$' THEN CAST(b.bill_no AS INTEGER) ELSE 0 END DESC
       LIMIT 10
     `);
 
@@ -380,6 +379,15 @@ app.get('/api/dashboard', async (req, res) => {
                transaction_id, customer_id, bill_date, grand_total 
         FROM bills
         ORDER BY transaction_id
+      ),
+      lifetime_data AS (
+        SELECT 
+          COALESCE(SUM(grand_total), 0) as total_rev,
+          COALESCE(COUNT(*), 0) as total_bills
+        FROM unique_bills
+      ),
+      pieces_data AS (
+        SELECT COALESCE(SUM(pieces), 0) as total_pieces FROM bills
       ),
       monthly_totals AS (
         SELECT 
@@ -394,21 +402,26 @@ app.get('/api/dashboard', async (req, res) => {
         (SELECT COALESCE(SUM(grand_total), 0) FROM unique_bills WHERE date_trunc('month', bill_date) = date_trunc('month', CURRENT_DATE - INTERVAL '1 month')) as last_month_total,
         (SELECT COALESCE(MAX(total), 0) FROM monthly_totals) as best_month_total,
         (SELECT COALESCE(SUM(grand_total), 0) FROM unique_bills WHERE date_trunc('year', bill_date) = date_trunc('year', CURRENT_DATE)) as year_total,
-        (SELECT COALESCE(SUM(grand_total), 0) FROM unique_bills) as lifetime_total,
+        ld.total_rev as lifetime_total,
         (SELECT name FROM (
           SELECT COALESCE(c.name, 'Walk-in') as name, SUM(b.grand_total) as total_spent 
           FROM unique_bills b 
           LEFT JOIN customers c ON b.customer_id = c.id 
           GROUP BY 1 ORDER BY total_spent DESC LIMIT 1
         ) t) as top_customer,
-        (SELECT COALESCE(SUM(total_amount), 0) FROM purchases) as total_investment
+        (SELECT COALESCE(SUM(total_amount), 0) FROM purchases) as total_investment,
+        pd.total_pieces as total_pieces_sold,
+        CASE WHEN ld.total_bills > 0 THEN ld.total_rev / ld.total_bills ELSE 0 END as avg_bill_value,
+        CASE WHEN pd.total_pieces > 0 THEN ld.total_rev / pd.total_pieces ELSE 0 END as avg_selling_price,
+        CASE WHEN ld.total_bills > 0 THEN CAST(pd.total_pieces AS DECIMAL) / ld.total_bills ELSE 0 END as avg_basket_size
+      FROM lifetime_data ld, pieces_data pd
     `);
 
-    console.log("Dashboard Stats Calculated:", stats.rows[0]);
+    console.log("Calculated Dashboard Stats:", stats.rows[0]);
 
     res.json({
       recentBills: lastBills.rows,
-      summary: stats.rows[0]
+      summary: { ...stats.rows[0], __debug_ver: 2 }
     });
   } catch (err) {
     console.error("Error fetching dashboard:", err);
